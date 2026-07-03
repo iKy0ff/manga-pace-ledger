@@ -1,0 +1,43 @@
+name: Sync Kitsu Manga Stats
+
+on:
+  schedule:
+    # Offset from :00/:15/:30/:45 to avoid the pile-up of jobs everyone
+    # else schedules on the exact quarter-hour (reduces run delays).
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch: {} # lets you trigger a run manually from the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kitsu-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run sync script
+        run: node scripts/sync.mjs
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "manga-sync-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A -- manga_history_data.js manga_history_data.bak "manga_history_data_*.bak.js" sync_errors.log
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "sync: update manga chapter data [skip ci]"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push
+          fi
