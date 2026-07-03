@@ -4,7 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>進行中 — Manga Pace Ledger</title>
-<script src="manga_history_data.js"></script>
+<script>
+  // Cache-busting loader: appends a fresh timestamp to the URL on every
+  // page load so browsers (and mobile Safari/Chrome in particular) can't
+  // serve a stale cached copy of the data file. document.write keeps this
+  // behaving exactly like the original synchronous <script src> tag, so
+  // load order relative to the scripts below is unchanged.
+  document.write('<script src="manga_history_data.js?v=' + Date.now() + '"><\/script>');
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
