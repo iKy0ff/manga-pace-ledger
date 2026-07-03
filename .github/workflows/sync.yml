@@ -33,7 +33,13 @@ jobs:
         run: |
           git config user.name "manga-sync-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add -A -- manga_history_data.js manga_history_data.bak "manga_history_data_*.bak.js" sync_errors.log
+          
+          # Stage files individually so missing ones don't trigger a fatal error
+          git add manga_history_data.js 2>/dev/null || true
+          git add manga_history_data.bak 2>/dev/null || true
+          git add manga_history_data_*.bak.js 2>/dev/null || true
+          git add sync_errors.log 2>/dev/null || true
+          
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
