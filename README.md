@@ -3,7 +3,7 @@
 
 A self-updating dashboard that tracks manga chapters read (via [Kitsu](https://kitsu.io)), synced automatically in the cloud and viewable from any device — no PC required to be on.
 
-**[→ View the live tracker](https://iky0ff.github.io/manga-tracker/kitsu_tracker.html)**
+**[→ View the live tracker](https://iky0ff.github.io/manga-pace-ledger/kitsu_tracker.html)**
 
 ---
 
