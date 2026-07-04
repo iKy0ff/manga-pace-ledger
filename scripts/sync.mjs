@@ -6,11 +6,13 @@ import path from 'node:path';
 
 const DATA_FILE = path.join(process.cwd(), 'manga_history_data.js');
 const ERROR_LOG = path.join(process.cwd(), 'sync_errors.log');
+const DAILY_BACKUP_DIR = path.join(process.cwd(), 'daily_backup');
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
 const ANOMALY_THRESHOLD = 500; // flag jumps of this many chapters or more instead of trusting them
 const KITSU_URL = 'https://kitsu.io/api/edge/users/1699796/stats';
+const KEEP_DAILY_BACKUPS = 30; // days of dated backups to retain before auto-deleting older ones
 
 function logError(msg) {
   const line = `[${new Date().toString()}] ${msg}\n`;
@@ -95,13 +97,38 @@ function backup() {
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
-  const dated = path.join(process.cwd(), `manga_history_data_${y}${m}${d}.bak.js`);
+
+  if (!fs.existsSync(DAILY_BACKUP_DIR)) fs.mkdirSync(DAILY_BACKUP_DIR, { recursive: true });
+
+  const dated = path.join(DAILY_BACKUP_DIR, `manga_history_data_${y}${m}${d}.bak.js`);
   const rolling = path.join(process.cwd(), 'manga_history_data.bak');
   try {
     fs.copyFileSync(DATA_FILE, rolling);
     fs.copyFileSync(DATA_FILE, dated);
   } catch (err) {
     logError(`WARNING: backup copy failed - ${err.message}`);
+  }
+
+  pruneOldBackups();
+}
+
+function pruneOldBackups() {
+  if (!fs.existsSync(DAILY_BACKUP_DIR)) return;
+  const cutoff = Date.now() - KEEP_DAILY_BACKUPS * 24 * 60 * 60 * 1000;
+  const pattern = /^manga_history_data_(\d{4})(\d{2})(\d{2})\.bak\.js$/;
+
+  for (const file of fs.readdirSync(DAILY_BACKUP_DIR)) {
+    const match = file.match(pattern);
+    if (!match) continue;
+    const [, yy, mm, dd] = match;
+    const fileDate = new Date(`${yy}-${mm}-${dd}T00:00:00`).getTime();
+    if (fileDate < cutoff) {
+      try {
+        fs.unlinkSync(path.join(DAILY_BACKUP_DIR, file));
+      } catch (err) {
+        logError(`WARNING: failed to prune old backup ${file} - ${err.message}`);
+      }
+    }
   }
 }
 

@@ -38,7 +38,7 @@ jobs:
           # Stage files individually so missing ones don't trigger a fatal error
           git add manga_history_data.js 2>/dev/null || true
           git add manga_history_data.bak 2>/dev/null || true
-          git add manga_history_data_*.bak.js 2>/dev/null || true
+          git add -A daily_backup/ 2>/dev/null || true
           git add sync_errors.log 2>/dev/null || true
           
           if git diff --cached --quiet; then
