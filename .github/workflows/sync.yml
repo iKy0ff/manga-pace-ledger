@@ -18,6 +18,29 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TZ: 'Europe/Paris'
+
+    # ── Sync mode gate ─────────────────────────────────────────────────
+    # Controlled by the repo variable SYNC_MODE (Settings → Secrets and
+    # variables → Actions → Variables). No YAML editing needed to switch —
+    # just change the variable's value. Allowed values:
+    #
+    #   manual  → job never runs on GitHub at all (run scripts/sync.mjs
+    #             on your own machine instead)
+    #   github  → only GitHub's own schedule trigger runs the sync
+    #             (workflow_dispatch still works for manual test runs)
+    #   cron    → GitHub's schedule trigger is ignored; only an external
+    #             call to the workflow_dispatch API (e.g. cron-job.org)
+    #             runs the sync
+    #   both    → both triggers run the sync (default if unset)
+    #
+    # Note: the `schedule:` trigger above still fires on GitHub's cron
+    # regardless of mode — this gate just makes the job skip instantly
+    # (no checkout, no Node setup) instead of running the sync, so
+    # unwanted runs cost effectively nothing.
+    if: >-
+      (github.event_name == 'schedule' && (vars.SYNC_MODE == '' || vars.SYNC_MODE == 'github' || vars.SYNC_MODE == 'both')) ||
+      (github.event_name == 'workflow_dispatch' && vars.SYNC_MODE != 'manual')
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,3 +71,4 @@ jobs:
             git pull --rebase origin "${GITHUB_REF_NAME}"
             git push
           fi
+

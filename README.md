@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/29651667/README.md)
 # 📖 Manga Pace Ledger
 
 A self-updating dashboard that tracks manga chapters read (via [Kitsu](https://kitsu.io)), synced automatically in the cloud and viewable from any device — no PC required to be on.
@@ -17,6 +16,7 @@ A self-updating dashboard that tracks manga chapters read (via [Kitsu](https://k
 - [Setup](#setup)
   - [Option A — GitHub Actions only](#option-a--github-actions-only-simplest)
   - [Option B — GitHub Actions + an external cron pinger](#option-b--github-actions--an-external-cron-pinger-more-frequent-updates)
+- [Switching sync modes](#switching-sync-modes)
 - [Pointing it at your own Kitsu account](#pointing-it-at-your-own-kitsu-account)
 - [Customizing](#customizing)
 - [More / notes](#more--notes)
@@ -54,11 +54,11 @@ A scheduled GitHub Actions workflow polls the Kitsu API, compares the result to 
 | `manga_history_data.js` | The data file. An array of `{ date1, date2, chapters }` entries; overwritten in place by the sync. |
 | `scripts/sync.mjs` | Node script that fetches Kitsu, parses the chapter count, and appends/updates an entry. |
 | `.github/workflows/sync.yml` | Scheduled workflow that runs `sync.mjs` and commits the result. |
-| `manga_history_data.bak` | Rolling backup — last version of the data file before the most recent write. |
-| `manga_history_data_YYYYMMDD.bak.js` | One dated backup per day, refreshed on same-day reruns. |
+| `manga_history_data.bak` | Rolling backup — last version of the data file before the most recent write. Always overwritten in place, so it never grows. |
+| `daily_backup/manga_history_data_YYYYMMDD.bak.js` | One dated backup per day, refreshed on same-day reruns. Auto-pruned after 30 days — see [below](#the-sync-logic). |
 | `sync_errors.log` | Timestamped log of failed fetches, parse errors, or skipped anomalies. Empty/absent when everything's healthy. |
-| `fetch_manga_stats.vbs` | Original Windows script this was ported from. Kept as an optional local fallback — not required for the automated flow. |
-| `favicon.ico`, `favicon-*.png` | Site favicon (browser tab / home-screen icon). |
+| `local-fallback/fetch_manga_stats.vbs` | Original Windows script this was ported from. Only relevant if you want to run the sync locally instead of via GitHub Actions — not needed for the automated flow. |
+| `favicons/` | Site favicon set (browser tab / home-screen icon) — `favicon.ico` plus PNGs at several sizes. |
 
 ---
 
@@ -70,9 +70,10 @@ Each run:
 2. Locates the `manga-amount-consumed` stat and extracts its `units` value.
 3. Compares it to the last recorded chapter count:
    - **Same value** → just refreshes the "last checked" timestamp on the final entry.
-   - **Higher value, normal jump** → backs up the data file, then appends a new entry.
+   - **Higher value, normal jump** → backs up the data file (rolling `.bak` + a dated copy in `daily_backup/`), then appends a new entry.
    - **Jump of 500+ chapters** (configurable) → treated as a probable bad API response, not a real reading binge. Logged as an anomaly and **skipped** rather than written.
-4. Commits and pushes only if the file actually changed — no empty commit spam.
+4. Prunes any file in `daily_backup/` older than `KEEP_DAILY_BACKUPS` (default **30 days**), so the folder doesn't grow forever.
+5. Commits and pushes only if something actually changed — no empty commit spam.
 
 ---
 
@@ -84,6 +85,7 @@ Each run:
 - **Never commit a token to the repo.** Whether you use GitHub's built-in scheduler or an external cron service, any Personal Access Token (PAT) belongs only in that external service's own secret/credential storage — never in a workflow file, a commit, or anywhere public. If you ever paste a token into a screenshot, chat, or issue by mistake, treat it as compromised and revoke it immediately from **GitHub → Settings → Developer settings → Personal access tokens**.
 - **Scope tokens minimally.** A PAT used only to trigger this workflow needs at most `repo` (classic) or `Actions: Read and write` + `Contents: Read and write` (fine-grained) — it doesn't need full account access.
 - **Public repo required for the free tier.** GitHub Pages and unlimited Actions minutes on the free plan require a public repository. Don't put anything you want private in this repo.
+- **Running both GitHub's schedule and an external pinger at once means more total runs than either alone.** Not harmful (`concurrency` prevents overlap, and unchanged data just refreshes a timestamp), but it does burn more Actions minutes than necessary. If you only want one source of truth for timing, set `SYNC_MODE` accordingly — see [Switching sync modes](#switching-sync-modes).
 
 ---
 
@@ -125,13 +127,44 @@ Because GitHub's own scheduler can lag under load, you can instead have a third-
      | `X-GitHub-Api-Version` | `2022-11-28` |
    - **Schedule:** whatever interval you want (e.g. every 15 minutes). Don't go below ~5 minutes — see the warnings above.
 3. Save and run the job once manually to confirm it returns a `204 No Content` response and that a new run appears in your repo's **Actions** tab.
-4. Keep `.github/workflows/sync.yml`'s own `schedule:` trigger in place too if you like — it acts as a fallback in case the external pinger ever stops running. The two don't conflict; `concurrency` in the workflow prevents overlapping runs.
+4. Decide whether you want GitHub's own `schedule:` trigger to stay active alongside the external pinger, or to switch it off so only the cron service drives the sync — see [Switching sync modes](#switching-sync-modes) below.
 
 > Paste your own token into the cron service's own credential field only — never into this repo, a commit, or anywhere that ends up public. If a token is ever exposed, revoke it immediately and generate a new one.
 
 ---
 
+## Switching sync modes
+
+The workflow supports four modes, controlled by a single repository variable — no editing of `sync.yml` required to switch between them.
+
+| Mode | What runs the sync | When to use it |
+|---|---|---|
+| **Manual (local)** | Nothing automatic — you run `node scripts/sync.mjs` on your own machine whenever you want | You don't want anything running on GitHub's infrastructure at all |
+| **GitHub only** | GitHub's own `schedule:` trigger in `sync.yml` | Simplest cloud setup — no external service, accept GitHub's scheduling delays (see [warnings](#️-warnings--things-to-know)) |
+| **Cron website only** | Only an external call to the `workflow_dispatch` API (e.g. from cron-job.org) | You've set up [Option B](#option-b--github-actions--an-external-cron-pinger-more-frequent-updates) and want tighter timing, without GitHub's own schedule also firing in parallel |
+| **GitHub and cron** | Both — GitHub's schedule *and* the external pinger | Belt-and-suspenders: the external pinger provides consistent timing, GitHub's own schedule acts as a fallback if the external service ever goes down |
+
+### How to set it
+
+1. Go to your repo's **Settings → Secrets and variables → Actions → Variables tab → New repository variable**.
+2. Name it `SYNC_MODE`.
+3. Set the value to one of: `manual`, `github`, `cron`, `both`.
+4. Save. The next time the workflow would run, it reads this variable and decides whether to actually execute.
+
+If `SYNC_MODE` is never created, the workflow defaults to `both` — matching the original out-of-the-box behavior, so nothing breaks if you skip this step entirely.
+
+### How it actually works
+
+`sync.yml`'s `schedule:` trigger still fires on GitHub's cron no matter what — GitHub doesn't let you conditionally register a trigger. What changes based on `SYNC_MODE` is a job-level `if:` check at the very top of the job: when the mode says "don't run this trigger," the job is skipped instantly, before checkout or Node setup even happen. Skipped jobs cost effectively nothing in Actions minutes, so leaving the schedule trigger physically present in the file is harmless even when you're not using it.
+
+For **Manual (local)** mode specifically, both the `schedule` and `workflow_dispatch` triggers are blocked — including the "Run workflow" button in the Actions tab. If you ever want to do a one-off cloud test run while in this mode, temporarily switch `SYNC_MODE` to something else, run it, then switch back.
+
+Note: the **"⇅ Check Live"** button on the dashboard itself is a separate, unrelated feature — it does a one-off client-side check straight from your browser and only affects what you see locally in that browser tab. It works regardless of which `SYNC_MODE` you're in.
+
+---
+
 ## Pointing it at your own Kitsu account
+
 
 The Kitsu user ID is baked directly into the URL in **two places** — anyone forking this repo needs to change both, or it'll keep syncing the original owner's chapter count, not yours:
 
@@ -160,10 +193,14 @@ The cron in `sync.yml` controls how often GitHub itself checks for updates. Edit
 
 `ANOMALY_THRESHOLD` in `scripts/sync.mjs` (default `500`) controls how big a single jump in chapter count can be before it's flagged instead of trusted. Raise it if you binge-read in large batches; lower it if you want tighter guardrails.
 
+### Adjusting backup retention
+
+`KEEP_DAILY_BACKUPS` in `scripts/sync.mjs` (default `30`) controls how many days of dated backups are kept in `daily_backup/` before older ones are automatically deleted. Raise it if you want a longer history of backups on disk; lower it to keep the repo leaner.
+
 ---
 
 ## More / notes
 
 - The dashboard's data file is loaded with a cache-busting timestamp (`manga_history_data.js?v=...`), so browsers — mobile ones especially — always pull the latest synced data instead of a stale cached copy.
-- The `fetch_manga_stats.vbs` script and its Windows Task Scheduler job are no longer required once the GitHub Actions workflow is running, but can be kept as a manual/offline fallback.
+- The `local-fallback/fetch_manga_stats.vbs` script and its Windows Task Scheduler job are no longer required once the GitHub Actions workflow is running, but can be kept as a manual/offline fallback.
 - Everything here — the workflow, the sync script, and the dashboard — reads from the same `manga_history_data.js` file, so Option A and Option B are fully interchangeable; you can switch between them at any time without touching your data.
