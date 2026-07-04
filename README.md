@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/29652153/README.md)
 # 📖 Manga Pace Ledger
 
 A self-updating dashboard that tracks manga chapters read (via [Kitsu](https://kitsu.io)), synced automatically in the cloud and viewable from any device — no PC required to be on.
@@ -185,17 +184,18 @@ Note: the **"⇅ Check Live"** button on the dashboard itself is a separate, unr
 
 ## Pointing it at your own Kitsu account
 
-The Kitsu user ID is baked directly into the URL in **two places** — anyone forking this repo needs to change both, or it'll keep syncing the original owner's chapter count, not yours:
+The Kitsu user ID is baked directly into the URL in **three places** — anyone forking this repo needs to change all of them, or it'll keep syncing the original owner's chapter count, not yours:
 
 | File | Line |
 |---|---|
 | `scripts/sync.mjs` | `const KITSU_URL = 'https://kitsu.io/api/edge/users/<KITSU_USER_ID>/stats';` |
 | `manga-pace-ledger.html` | inside `checkForUpdates()`: `fetch('https://kitsu.io/api/edge/users/<KITSU_USER_ID>/stats?cachebuster=...')` |
+| `local-fallback/fetch_manga_stats.vbs` | `url = "https://kitsu.io/api/edge/users/<KITSU_USER_ID>/stats?cachebuster=" & timestamp` — only relevant if you plan to use the Windows fallback script |
 
 **To point it at your own account:**
 
 1. Find your Kitsu user ID — go to `https://kitsu.io/api/edge/users?filter[slug]=YOUR_USERNAME` in a browser (or check your profile URL/page source) and copy the numeric `id` field.
-2. Replace the placeholder ID with that number in both files above.
+2. Replace the placeholder ID with that number in the files above (at minimum the first two; the third only if you use the VBS fallback).
 3. Since your reading history will start from zero, either let `manga_history_data.js` reinitialize on the next sync (delete its contents and start fresh) or manually seed it with your own historical data in the same `{ date1, date2, chapters }` format.
 
 Note: `scripts/sync.mjs` will auto-create `manga_history_data.js` with a single starting entry if the file doesn't exist yet, so deleting it entirely before the first run on a new account works fine.
