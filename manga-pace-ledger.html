@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>進行中 — Manga Pace Ledger</title>
-<meta name="description" content="A self-updating manga reading tracker synced from Kitsu — streaks, pace, goals, and chapter history, viewable from any device.">
+<title>進行中 — Manga Pace Ledger</title><meta name="description" content="A self-updating manga reading tracker synced from Kitsu — streaks, pace, goals, and chapter history, viewable from any device.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="進行中 — Manga Pace Ledger">
 <meta property="og:description" content="A self-updating manga reading tracker synced from Kitsu — streaks, pace, goals, and chapter history.">
@@ -68,6 +67,28 @@
     --good-rgb: 44,107,40;
   }
 
+  html[data-theme="dark"]{
+    --paper: #1e1a16;
+    --paper-deep: #29241f;
+    --ink: #b8ab8f;
+    --ink-soft: #8f8369;
+    --ink-faint: #5f5646;
+    --stamp-red: #d85f45;
+    --stamp-red-deep: #f0805f;
+    --gold: #c99a3e;
+    --line: #b8ab8f;
+    --good: #7ec178;
+    --good-deep: #98d890;
+    --ink-rgb: 184,171,143;
+    --stamp-red-rgb: 216,95,69;
+    --good-rgb: 126,193,120;
+  }
+
+  [data-reduce-motion="1"] *{
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+
   *{ box-sizing:border-box; }
 
   @media (prefers-reduced-motion: reduce){
@@ -92,7 +113,10 @@
     border-bottom:5px solid var(--ink);
     padding-bottom:18px; margin-bottom:34px; gap:20px; flex-wrap:wrap;
   }
-  .title-block{ display:flex; align-items:baseline; gap:16px; }
+  .title-block{ display:flex; align-items:baseline; gap:16px; cursor:pointer; border-radius:4px; }
+  .title-block:hover .kanji-tag{ background:var(--stamp-red-deep); }
+  .title-block:hover h1{ opacity:0.85; }
+  .title-block:focus-visible{ outline:3px solid var(--gold); outline-offset:4px; }
   .kanji-tag{
     font-size:15px; letter-spacing:.2em; color:var(--paper);
     background:var(--stamp-red); padding:5px 10px; font-weight:700;
@@ -104,11 +128,50 @@
     text-transform:uppercase;
   }
   h1 span{ color:var(--stamp-red); }
-  .header-right{ display:flex; align-items:center; gap:14px; }
+  .home-utility-bar{
+    display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+    margin-bottom:24px; padding-bottom:20px; border-bottom:3px dashed var(--ink-faint);
+  }
+  .home-utility-left{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .home-utility-right{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .hamburger-btn{
+    font-family:'JetBrains Mono', monospace; font-weight:700; font-size:20px; line-height:1;
+    background:transparent; color:var(--ink); border:2px solid var(--ink); padding:10px 16px;
+    cursor:pointer; transition:background .15s ease, color .15s ease;
+  }
+  .hamburger-btn:hover{ background:var(--ink); color:var(--paper); }
+  .hamburger-btn:focus-visible{ outline:3px solid var(--gold); outline-offset:2px; }
+
+  /* ---------- PAGES ---------- */
+  .page{ display:none; }
+  .page.active{ display:block; }
+
+  /* ---------- NAV DRAWER ---------- */
+  .nav-overlay{
+    display:none; position:fixed; inset:0; background:rgba(var(--ink-rgb),0.5);
+    z-index:1200;
+  }
+  .nav-overlay.open{ display:block; }
+  .nav-drawer{
+    position:fixed; top:0; right:0; height:100%; width:280px; max-width:82vw;
+    background:var(--paper); border-left:3px solid var(--ink); box-shadow:-9px 0 0 var(--ink);
+    display:flex; flex-direction:column; padding:24px 22px; gap:4px;
+    transform:translateX(100%); transition:transform .25s ease;
+  }
+  .nav-overlay.open .nav-drawer{ transform:translateX(0); }
+  .nav-link{
+    font-family:'JetBrains Mono', monospace; text-transform:uppercase; letter-spacing:.08em;
+    font-size:15px; font-weight:700; text-align:left; background:none; border:none;
+    border-bottom:2px dashed var(--ink-faint); color:var(--ink); padding:16px 6px;
+    cursor:pointer; transition:color .15s ease, background .15s ease;
+  }
+  .nav-link:last-of-type{ border-bottom:none; }
+  .nav-link:hover{ background:rgba(var(--stamp-red-rgb),0.06); }
+  .nav-link.active{ color:var(--stamp-red-deep); }
   #stale-warning{
     display:none; font-family:'JetBrains Mono', monospace; font-size:12px;
     letter-spacing:.05em; color:var(--stamp-red-deep); border:2px solid var(--stamp-red-deep);
-    padding:8px 12px; background:#f3e2c8; font-weight:700;
+    padding:8px 12px; background:rgba(var(--stamp-red-rgb),0.12); font-weight:700;
   }
   .sync-btn{
     font-family:'JetBrains Mono', monospace; font-weight:700; font-size:13px;
@@ -196,19 +259,16 @@
   }
 
   /* Hanko stamp */
+  .tracked-header-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px; }
   .stamp{
-    position:absolute; top:-22px; right:24px; width:92px; height:92px;
-    border:4px solid var(--stamp-red); border-radius:6px; transform:rotate(-9deg);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    color:var(--stamp-red); background:rgba(var(--stamp-red-rgb),0.06); mix-blend-mode:multiply;
-    font-family:'JetBrains Mono', monospace; text-align:center; pointer-events:none;
+    width:72px; height:72px; flex-shrink:0;
+    transform:rotate(-9deg); color:var(--stamp-red); mix-blend-mode:multiply;
+    pointer-events:none; overflow:visible;
   }
-  .stamp .kanji{ font-size:20px; font-weight:700; line-height:1; }
-  .stamp small{ font-size:9px; letter-spacing:.1em; margin-top:4px; }
-  .stamp.stamp-left{ right:auto; left:24px; top:-64px; transform:rotate(8deg); }
-  .stamp.stamp-gold{ border-color:var(--gold); color:var(--gold); background:rgba(161,121,31,0.08); }
-  .stamp-ahead{ border-color:var(--good) !important; color:var(--good) !important; background:rgba(var(--good-rgb),0.08) !important; }
-  .stamp-behind{ border-color:var(--stamp-red) !important; color:var(--stamp-red) !important; background:rgba(var(--stamp-red-rgb),0.06) !important; }
+  .stamp.stamp-gold{ color:var(--gold); }
+  .stamp-ahead{ color:var(--good) !important; }
+  .stamp-behind{ color:var(--stamp-red) !important; }
+  html[data-theme="dark"] .stamp{ mix-blend-mode:normal; }
 
   /* Range / view toggle (all/7d/30d, cumulative/daily) */
   .range-toggle{ display:flex; gap:0; margin-top:14px; flex-wrap:wrap; }
@@ -268,19 +328,26 @@
   .save-goal-btn{
     font-family:'JetBrains Mono', monospace; font-weight:700; font-size:13px;
     background:var(--ink); color:var(--paper); border:none; padding:12px 18px;
-    letter-spacing:.05em; cursor:pointer; text-transform:uppercase; align-self:flex-start;
+    letter-spacing:.05em; cursor:pointer; text-transform:uppercase;
     transition:background .15s ease;
   }
   .save-goal-btn:hover{ background:var(--stamp-red); }
   .save-goal-btn:focus-visible{ outline:3px solid var(--gold); outline-offset:2px; }
 
-  /* Config import/export */
-  .config-io{ display:flex; gap:10px; margin-top:20px; padding-top:16px; border-top:2px dashed var(--ink-faint); flex-wrap:wrap; }
+  /* Settings page */
+  .settings-section{ margin-bottom:22px; }
+  .settings-section:last-child{ margin-bottom:0; }
+  .settings-checkbox{
+    display:flex; align-items:center; gap:10px; font-family:'JetBrains Mono', monospace;
+    font-size:13px; color:var(--ink-soft); margin-bottom:12px; cursor:pointer; letter-spacing:.02em;
+  }
+  .settings-checkbox:last-child{ margin-bottom:0; }
+  .settings-checkbox input[type="checkbox"]{ width:18px; height:18px; accent-color:var(--stamp-red); cursor:pointer; }
   .file-label{ display:inline-flex; align-items:center; }
 
   /* Live update status */
-  .update-status{ font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--ink-soft); margin:-20px 0 0; min-height:0; }
-  .update-status:not(:empty){ margin-bottom:24px; min-height:16px; }
+  .update-status{ font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--ink-soft); }
+  .update-status:empty{ display:none; }
   .update-status .toggle-btn{ margin-left:10px; padding:5px 12px; font-size:11px; }
 
   /* Week delta / consistency / ETA text */
@@ -292,7 +359,7 @@
   .goal-eta-line{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
 
   /* Personal bests 2x2 grid */
-  .analytics-grid.cols-2 .stat-box:nth-child(2n+1){ border-left:none; }
+  .analytics-grid.cols-2 .stat-box:nth-child(2n+1){ border-left:none; padding-left:0; }
   .analytics-grid.cols-2 .stat-box:nth-child(n+3){ border-top:2px dashed var(--ink-faint); padding-top:14px; }
 
   /* Reading pattern mini charts */
@@ -310,6 +377,14 @@
     border:2px solid var(--stamp-red); padding:10px 16px; margin-bottom:14px;
     font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--ink);
   }
+
+  /* Unsaved-edits note (edits live only in this browser tab until exported) */
+  .unsaved-note{
+    font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--stamp-red-deep);
+    background:rgba(var(--stamp-red-rgb),0.08); border:2px dashed var(--stamp-red-deep);
+    padding:8px 12px; margin:8px 0 14px; letter-spacing:.02em;
+  }
+  .unsaved-note code{ font-family:'JetBrains Mono', monospace; font-weight:700; }
 
   /* Change history */
   .change-log-row{
@@ -349,6 +424,7 @@
     padding:16px;
   }
   .chart-container{ height:380px; width:100%; }
+  #chart-slot-full .chart-container{ height:min(70vh, 640px); }
 
   /* History table */
   .history-head{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:6px; }
@@ -394,10 +470,7 @@
     .goal-stats-grid{ grid-template-columns:1fr; }
     .goal-stats-grid .stat-box{ border-left:none; border-top:2px dashed var(--ink-faint); padding-left:14px; }
     .goal-stats-grid .stat-box:first-child{ border-top:none; }
-    .panel{ padding-top:40px; }
-    .stamp{ width:76px; height:76px; top:-16px; }
-    .stamp.stamp-left{ left:12px; }
-    .stamp:not(.stamp-left){ right:12px; }
+    .stamp{ width:56px; height:56px; }
   }
 </style>
 </head>
@@ -405,151 +478,281 @@
 <div class="wrap">
 
   <header>
-    <div class="title-block">
+    <div class="title-block" onclick="showPage('home')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); showPage('home');}" role="button" tabindex="0" aria-label="Go to home page">
       <span class="kanji-tag">読破</span>
       <h1>Manga <span>Pace</span> Ledger</h1>
     </div>
-    <div class="header-right">
-      <div id="stale-warning">⚠ STALE — NO SYNC IN 24H</div>
-      <span id="last-synced">—</span>
-      <button class="theme-btn" id="themeToggle" onclick="toggleTheme()">☾ Paper</button>
-      <button class="theme-btn" id="checkUpdatesBtn" onclick="checkForUpdates()">⇅ Check Live</button>
-      <button class="sync-btn" onclick="location.reload()">⟳ Sync Data</button>
-    </div>
+    <button class="hamburger-btn" id="navToggle" onclick="openNav()" aria-label="Open menu" aria-haspopup="true">☰</button>
   </header>
 
-  <div class="update-status" id="updateStatus"></div>
+  <div class="nav-overlay" id="navOverlay" onclick="if(event.target===this) closeNav()">
+    <nav class="nav-drawer" id="navDrawer" aria-label="Main navigation">
+      <button class="icon-btn" onclick="closeNav()" aria-label="Close menu" style="align-self:flex-end; margin-bottom:10px;">✕</button>
+      <button class="nav-link" data-page="home" onclick="showPage('home')">Home</button>
+      <button class="nav-link" data-page="goal" onclick="showPage('goal')">Goal</button>
+      <button class="nav-link" data-page="chart" onclick="showPage('chart')">Chart</button>
+      <button class="nav-link" data-page="history" onclick="showPage('history')">History</button>
+      <button class="nav-link" data-page="settings" onclick="showPage('settings')">Settings</button>
+    </nav>
+  </div>
 
-  <div class="grid">
-
-    <div class="panel tilt-l hero">
-      <div class="stamp stamp-gold" id="streak-stamp">
-        <div class="kanji" id="streak-kanji">0</div>
-        <small>DAY STREAK</small>
+  <!-- ============ HOME ============ -->
+  <div class="page" id="page-home">
+    <div class="home-utility-bar">
+      <div class="home-utility-left">
+        <div id="stale-warning">⚠ STALE — NO RECENT SYNC</div>
+        <span id="last-synced">—</span>
+        <span class="update-status" id="updateStatus"></span>
       </div>
-      <p class="eyebrow">Chapters logged</p>
-      <div class="hero-num" id="current-count">0</div>
-      <div class="hero-label">Total chapters read, per Kitsu ledger</div>
-    </div>
-
-    <div class="panel tilt-r">
-      <p class="eyebrow">Personal bests</p>
-      <div class="analytics-grid cols-2" style="grid-template-columns:1fr 1fr;">
-        <div class="stat-box">
-          <div class="stat-val" id="best-day">—</div>
-          <div class="stat-label">Best single day</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-val" id="best-week">—</div>
-          <div class="stat-label">Best 7-day run</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-val" id="avg-session">—</div>
-          <div class="stat-label">Avg session</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-val" id="longest-session">—</div>
-          <div class="stat-label">Longest session</div>
-        </div>
+      <div class="home-utility-right">
+        <button class="theme-btn" id="checkUpdatesBtn" onclick="checkForUpdates()">⇅ Check Live</button>
+        <button class="sync-btn" onclick="location.reload()">⟳ Sync Data</button>
       </div>
     </div>
 
-    <div class="panel full tilt-l">
-      <p class="eyebrow">Set a new goal</p>
-      <div class="goal-form" style="flex-direction:row; align-items:flex-end; flex-wrap:wrap;">
-        <div style="flex:1; min-width:180px;">
-          <label class="field-label" for="target-chapters">Target chapters</label>
-          <input type="number" id="target-chapters" placeholder="e.g. 34000">
-        </div>
-        <div style="flex:1; min-width:180px;">
-          <label class="field-label" for="target-date">Deadline</label>
-          <input type="date" id="target-date">
-        </div>
-        <button class="save-goal-btn" onclick="saveGoal()">+ Save Goal</button>
-      </div>
-      <div class="goal-list" id="goal-list">
-        <div class="no-goals" id="no-goals-msg">No goals saved yet — add one above.</div>
+    <div class="grid">
+
+      <div class="panel tilt-l hero">
+        <p class="eyebrow">Chapters logged</p>
+        <div class="hero-num" id="current-count">0</div>
+        <div class="hero-label">Total chapters read, per Kitsu ledger</div>
       </div>
 
-      <!-- Feature 5: Configuration backup / restore -->
-      <div class="config-io">
-        <button class="toggle-btn" onclick="exportConfig()">⬇ Export Configuration</button>
-        <label class="toggle-btn file-label">
-          ⬆ Import Configuration
-          <input type="file" accept="application/json" id="importConfigInput" onchange="importConfig(this.files[0])" style="display:none;">
-        </label>
+      <div class="panel tilt-r">
+        <p class="eyebrow">Personal bests</p>
+        <div class="analytics-grid cols-2" style="grid-template-columns:1fr 1fr;">
+          <div class="stat-box">
+            <div class="stat-val" id="best-day">—</div>
+            <div class="stat-label">Best single day</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="best-week">—</div>
+            <div class="stat-label">Best 7-day run</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="streak-stat">—</div>
+            <div class="stat-label">Day streak</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="avg-active-day">—</div>
+            <div class="stat-label">Avg on active day</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel full analytics-panel">
+        <div class="tracked-header-row">
+          <p class="eyebrow" id="tracked-goal-title" style="margin-bottom:0;">Tracked goal</p>
+          <svg class="stamp" id="pace-stamp" viewBox="0 0 120 120" aria-hidden="true">
+            <defs>
+              <filter id="hankoRough" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.06 0.07" numOctaves="3" seed="11" result="noise"/>
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.2"/>
+              </filter>
+              <filter id="hankoGrain" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="5" result="n"/>
+                <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0" result="na"/>
+                <feComposite in="na" in2="SourceGraphic" operator="in"/>
+              </filter>
+            </defs>
+            <g class="hanko-ink" fill="none" stroke="currentColor" filter="url(#hankoRough)">
+              <rect x="8" y="8" width="104" height="104" stroke-width="5"/>
+              <rect x="16" y="16" width="88" height="88" stroke-width="1.5" opacity="0.7"/>
+            </g>
+            <g class="hanko-ink" fill="currentColor" filter="url(#hankoRough)">
+              <text x="60" y="52" text-anchor="middle" font-family="'Zen Kaku Gothic New','Hiragino Sans',sans-serif" font-weight="900" font-size="34">配</text>
+              <text x="60" y="86" text-anchor="middle" font-family="'Zen Kaku Gothic New','Hiragino Sans',sans-serif" font-weight="900" font-size="34">分</text>
+            </g>
+            <text class="hanko-ink" x="60" y="103" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-weight="700" font-size="9" letter-spacing="3" fill="currentColor" filter="url(#hankoRough)">PACE</text>
+            <rect x="8" y="8" width="104" height="104" fill="currentColor" opacity="0.55" filter="url(#hankoGrain)"/>
+          </svg>
+        </div>
+        <div class="analytics-grid">
+          <div class="stat-box">
+            <div class="stat-val" id="daily-pace">—</div>
+            <div class="stat-label">Daily pace required</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="days-left">—</div>
+            <div class="stat-label">Time remaining</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="finish-date">—</div>
+            <div class="stat-label">Projected finish</div>
+          </div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="tracked-progress-fill" style="width:0%;"></div>
+          <div class="progress-pct" id="tracked-progress-pct">0%</div>
+        </div>
+        <div class="goal-eta-line" id="tracked-eta-line"></div>
+        <div class="week-delta-line" id="tracked-week-delta"></div>
+        <div id="historical-pace">Historical avg: —</div>
+        <div class="consistency-line" id="consistency-line"></div>
+        <div class="range-toggle" id="histRangeToggle">
+          <button class="range-btn active" data-range="all" onclick="setHistRange('all')">All-time</button>
+          <button class="range-btn" data-range="7" onclick="setHistRange('7')">Last 7d</button>
+          <button class="range-btn" data-range="30" onclick="setHistRange('30')">Last 30d</button>
+        </div>
+      </div>
+
+      <div class="panel full">
+        <p class="eyebrow">Reading heatmap</p>
+        <div class="heatmap-wrap">
+          <div class="heatmap-months" id="heatmap-months"></div>
+          <div class="heatmap-grid" id="heatmap-grid"></div>
+        </div>
+        <div class="heatmap-legend">
+          <span>Less</span>
+          <div class="heat-cell" style="background:var(--paper-deep);"></div>
+          <div class="heat-cell" style="background:rgba(var(--stamp-red-rgb),0.25);"></div>
+          <div class="heat-cell" style="background:rgba(var(--stamp-red-rgb),0.45);"></div>
+          <div class="heat-cell" style="background:rgba(var(--stamp-red-rgb),0.7);"></div>
+          <div class="heat-cell" style="background:rgba(var(--stamp-red-rgb),0.95);"></div>
+          <span>More</span>
+        </div>
+      </div>
+
+      <div class="panel full">
+        <p class="eyebrow">Reading patterns</p>
+        <div class="mini-chart-row">
+          <div class="mini-chart-col">
+            <div class="mini-chart-label">By day of week</div>
+            <div class="mini-chart-container"><canvas id="dowChart"></canvas></div>
+          </div>
+          <div class="mini-chart-col">
+            <div class="mini-chart-label">By hour of day</div>
+            <div class="mini-chart-container"><canvas id="hourChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel full" id="chart-slot-home"></div>
+
+    </div>
+  </div>
+
+  <!-- ============ GOAL ============ -->
+  <div class="page" id="page-goal">
+    <div class="grid">
+      <div class="panel full tilt-l">
+        <p class="eyebrow">Set a new goal</p>
+        <div class="goal-form" style="flex-direction:row; align-items:flex-end; flex-wrap:wrap;">
+          <div style="flex:1; min-width:180px;">
+            <label class="field-label" for="target-chapters">Target chapters</label>
+            <input type="number" id="target-chapters" placeholder="e.g. 34000">
+          </div>
+          <div style="flex:1; min-width:180px;">
+            <label class="field-label" for="target-date">Deadline</label>
+            <input type="date" id="target-date">
+          </div>
+          <button class="save-goal-btn" onclick="saveGoal()">+ Save Goal</button>
+        </div>
+        <div class="goal-list" id="goal-list">
+          <div class="no-goals" id="no-goals-msg">No goals saved yet — add one above.</div>
+        </div>
       </div>
     </div>
+  </div>
 
-    <div class="panel full analytics-panel">
-      <div class="stamp" id="pace-stamp">
-        <div class="kanji" id="pace-kanji">配分</div>
-        <small id="pace-small">PACE</small>
-      </div>
-      <p class="eyebrow" id="tracked-goal-title">Tracked goal</p>
-      <div class="analytics-grid">
-        <div class="stat-box">
-          <div class="stat-val" id="daily-pace">—</div>
-          <div class="stat-label">Daily pace required</div>
+  <!-- ============ CHART (fullscreen) ============ -->
+  <div class="page" id="page-chart">
+    <div class="grid">
+      <div class="panel full" id="chart-slot-full"></div>
+    </div>
+  </div>
+
+  <!-- ============ HISTORY ============ -->
+  <div class="page" id="page-history">
+    <div class="grid">
+      <div class="panel full">
+        <div class="history-head">
+          <p class="eyebrow" style="margin:0;">History matrix</p>
+          <div class="history-controls">
+            <input type="number" id="visible-input" onchange="updateVisible(this.value)">
+            <span>/ <span id="total-span">0</span> entries visible</span>
+            <button class="export-btn" onclick="exportCSV()">Export CSV</button>
+          </div>
         </div>
-        <div class="stat-box">
-          <div class="stat-val" id="days-left">—</div>
-          <div class="stat-label">Time remaining</div>
+        <button class="save-goal-btn" style="margin:14px 0 4px;" onclick="exportCleanedData()">⬇ Export Cleaned manga_history_data.js</button>
+        <div class="unsaved-note" id="unsaved-note" style="display:none;">⚠ You have unsaved edits — they only exist in this browser tab. Export the file above and replace <code>manga_history_data.js</code> in the repo, or they'll be lost next time this page loads.</div>
+        <div class="undo-banner" id="undo-banner" style="display:none;">
+          <span class="undo-banner-label">Entry deleted.</span>
+          <button class="toggle-btn" onclick="undoDelete()">Undo</button>
         </div>
-        <div class="stat-box">
-          <div class="stat-val" id="finish-date">—</div>
-          <div class="stat-label">Projected finish</div>
-        </div>
+        <table id="history-table">
+          <thead><tr><th>Start date</th><th>Last checked</th><th>Chapters</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
-      <div class="progress-track">
-        <div class="progress-fill" id="tracked-progress-fill" style="width:0%;"></div>
-        <div class="progress-pct" id="tracked-progress-pct">0%</div>
-      </div>
-      <div class="goal-eta-line" id="tracked-eta-line"></div>
-      <div class="week-delta-line" id="tracked-week-delta"></div>
-      <div id="historical-pace">Historical avg: —</div>
-      <div class="consistency-line" id="consistency-line"></div>
-      <div class="range-toggle" id="histRangeToggle">
-        <button class="range-btn active" data-range="all" onclick="setHistRange('all')">All-time</button>
-        <button class="range-btn" data-range="7" onclick="setHistRange('7')">Last 7d</button>
-        <button class="range-btn" data-range="30" onclick="setHistRange('30')">Last 30d</button>
+
+      <div class="panel full">
+        <p class="eyebrow">Change history</p>
+        <div id="change-log-list"></div>
       </div>
     </div>
+  </div>
 
-    <!-- Feature 1: Contribution heatmap -->
-    <div class="panel full">
-      <p class="eyebrow">Reading heatmap</p>
-      <div class="heatmap-wrap">
-        <div class="heatmap-months" id="heatmap-months"></div>
-        <div class="heatmap-grid" id="heatmap-grid"></div>
-      </div>
-      <div class="heatmap-legend">
-        <span>Less</span>
-        <div class="heat-cell" style="background:var(--paper-deep);"></div>
-        <div class="heat-cell" style="background:rgba(var(--stamp-red-rgb),0.25);"></div>
-        <div class="heat-cell" style="background:rgba(var(--stamp-red-rgb),0.45);"></div>
-        <div class="heat-cell" style="background:rgba(var(--stamp-red-rgb),0.7);"></div>
-        <div class="heat-cell" style="background:rgba(var(--stamp-red-rgb),0.95);"></div>
-        <span>More</span>
+  <!-- ============ SETTINGS ============ -->
+  <div class="page" id="page-settings">
+    <div class="grid">
+      <div class="panel full">
+        <p class="eyebrow">Settings</p>
+
+        <div class="settings-section">
+          <label class="field-label">Theme</label>
+          <div class="range-toggle" id="themeToggleGroup">
+            <button class="range-btn" data-theme="kraft" onclick="setTheme('kraft')">Kraft</button>
+            <button class="range-btn" data-theme="mono" onclick="setTheme('mono')">Mono</button>
+            <button class="range-btn" data-theme="dark" onclick="setTheme('dark')">Dark</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <label class="field-label">Default chart view</label>
+          <div class="range-toggle" id="defaultChartViewGroup">
+            <button class="range-btn" data-value="cumulative" onclick="setDefaultChartView('cumulative')">Cumulative</button>
+            <button class="range-btn" data-value="daily" onclick="setDefaultChartView('daily')">Daily Volume</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <label class="settings-checkbox">
+            <input type="checkbox" id="settingShowPoints" onchange="setDefaultShowPoints(this.checked)">
+            Show data points by default
+          </label>
+          <label class="settings-checkbox">
+            <input type="checkbox" id="settingShowGoalLine" onchange="setDefaultShowGoalLine(this.checked)">
+            Show goal line by default
+          </label>
+          <label class="settings-checkbox">
+            <input type="checkbox" id="settingReduceMotion" onchange="setReduceMotion(this.checked)">
+            Reduce motion / animations
+          </label>
+        </div>
+
+        <div class="settings-section">
+          <label class="field-label" for="settingStaleHours">Stale warning threshold (hours)</label>
+          <input type="number" id="settingStaleHours" min="1" max="720" step="1" onchange="setStaleHours(this.value)">
+        </div>
+
+        <div class="settings-section" style="border-top:2px dashed var(--ink-faint); padding-top:16px; margin-top:4px;">
+          <label class="field-label">Configuration backup</label>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="toggle-btn" onclick="exportConfig()">⬇ Export Configuration</button>
+            <label class="toggle-btn" style="cursor:pointer;">
+              ⬆ Import Configuration
+              <input type="file" accept="application/json" id="importConfigInput" onchange="importConfig(this.files[0])" style="display:none;">
+            </label>
+          </div>
+        </div>
       </div>
     </div>
+  </div>
 
-    <!-- Day-of-week / hour-of-day reading patterns -->
-    <div class="panel full">
-      <p class="eyebrow">Reading patterns</p>
-      <div class="mini-chart-row">
-        <div class="mini-chart-col">
-          <div class="mini-chart-label">By day of week</div>
-          <div class="mini-chart-container"><canvas id="dowChart"></canvas></div>
-        </div>
-        <div class="mini-chart-col">
-          <div class="mini-chart-label">By hour of day</div>
-          <div class="mini-chart-container"><canvas id="hourChart"></canvas></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel full">
+  <!-- Shared trajectory chart card — reparented between #chart-slot-home and #chart-slot-full -->
+  <template id="chart-card-template">
+    <div id="chart-card">
       <div class="traj-header">
         <p class="eyebrow" style="margin:0;">Trajectory over time</p>
         <div class="traj-controls">
@@ -567,57 +770,122 @@
       </div>
       <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--ink-faint); margin-top:10px; letter-spacing:.03em;">Scroll or pinch to zoom · drag to pan · "Show Goal Line" overlays the starred goal's target pace (off by default)</div>
     </div>
+  </template>
 
-    <div class="panel full">
-      <div class="history-head">
-        <p class="eyebrow" style="margin:0;">History matrix</p>
-        <div class="history-controls">
-          <input type="number" id="visible-input" onchange="updateVisible(this.value)">
-          <span>/ <span id="total-span">0</span> entries visible</span>
-          <button class="export-btn" onclick="exportCSV()">Export CSV</button>
-        </div>
-      </div>
-      <button class="save-goal-btn" style="margin:14px 0 4px;" onclick="exportCleanedData()">⬇ Export Cleaned manga_history_data.js</button>
-      <div class="undo-banner" id="undo-banner" style="display:none;">
-        <span>Entry deleted.</span>
-        <button class="toggle-btn" onclick="undoDelete()">Undo</button>
-      </div>
-      <table id="history-table">
-        <thead><tr><th>Start date</th><th>Last checked</th><th>Chapters</th><th>Actions</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-    <div class="panel full">
-      <p class="eyebrow">Change history</p>
-      <div id="change-log-list"></div>
-    </div>
-
-  </div>
 </div>
 
 <script>
   /* ============================================================
-     THEME (kraft / mono)
+     THEME (kraft / mono / dark)
   ============================================================ */
   const THEME_COLORS = {
       kraft: { red:'#ac3327', ink:'#17140f', inkSoft:'#56503f', inkFaint:'#8a8270', grid:'rgba(23,20,15,0.08)' },
-      mono:  { red:'#c22323', ink:'#0a0a0a', inkSoft:'#333333', inkFaint:'#767267', grid:'rgba(10,10,10,0.08)' }
+      mono:  { red:'#c22323', ink:'#0a0a0a', inkSoft:'#333333', inkFaint:'#767267', grid:'rgba(10,10,10,0.08)' },
+      dark:  { red:'#d85f45', ink:'#b8ab8f', inkSoft:'#8f8369', inkFaint:'#5f5646', grid:'rgba(184,171,143,0.12)' }
   };
 
   function applyTheme(theme) {
-      document.documentElement.setAttribute('data-theme', theme === 'mono' ? 'mono' : '');
-      const btn = document.getElementById('themeToggle');
-      if (btn) btn.innerText = theme === 'mono' ? '☀ Paper' : '☾ Paper';
+      const valid = THEME_COLORS[theme] ? theme : 'kraft';
+      document.documentElement.setAttribute('data-theme', valid === 'kraft' ? '' : valid);
+      document.querySelectorAll('#themeToggleGroup .range-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === valid));
       buildChart();
       buildPatternCharts();
   }
 
-  function toggleTheme() {
-      const current = localStorage.getItem('mangaTheme') || 'kraft';
-      const next = current === 'mono' ? 'kraft' : 'mono';
-      try { localStorage.setItem('mangaTheme', next); } catch (e) { /* storage unavailable */ }
-      applyTheme(next);
+  function setTheme(theme) {
+      try { localStorage.setItem('mangaTheme', theme); } catch (e) { /* storage unavailable */ }
+      applyTheme(theme);
+  }
+
+  /* ============================================================
+     PAGE NAVIGATION (hamburger side drawer + page switching)
+  ============================================================ */
+  function openNav() {
+      document.getElementById('navOverlay').classList.add('open');
+  }
+
+  function closeNav() {
+      document.getElementById('navOverlay').classList.remove('open');
+  }
+
+  function moveChartToSlot(slotId) {
+      const card = document.getElementById('chart-card');
+      const slot = document.getElementById(slotId);
+      if (!card || !slot) return;
+      if (card.parentElement !== slot) slot.appendChild(card);
+  }
+
+  function showPage(name) {
+      document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+      document.querySelectorAll('.nav-link').forEach(b => b.classList.toggle('active', b.dataset.page === name));
+
+      if (name === 'home' || name === 'chart') {
+          // Only resize once the chart's destination slot is actually visible —
+          // calling resize() on a hidden (display:none) container would make
+          // Chart.js cache a 0×0 layout that doesn't self-correct later.
+          moveChartToSlot(name === 'chart' ? 'chart-slot-full' : 'chart-slot-home');
+          if (chart) requestAnimationFrame(() => chart.resize());
+      } else {
+          // Park the chart back in its home slot while on any other page so
+          // it's ready to go next time, without resizing it while hidden.
+          moveChartToSlot('chart-slot-home');
+      }
+
+      if (name === 'settings') populateSettingsForm();
+      closeNav();
+      window.scrollTo(0, 0);
+  }
+
+  document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('navOverlay').classList.contains('open')) closeNav();
+  });
+
+  /* ============================================================
+     SETTINGS PANEL (theme + chart defaults + misc preferences)
+  ============================================================ */
+  function populateSettingsForm() {
+      const theme = localStorage.getItem('mangaTheme') || 'kraft';
+      document.querySelectorAll('#themeToggleGroup .range-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
+
+      const defaultView = localStorage.getItem('mangaDefaultChartView') || 'cumulative';
+      document.querySelectorAll('#defaultChartViewGroup .range-btn').forEach(b => b.classList.toggle('active', b.dataset.value === defaultView));
+
+      document.getElementById('settingShowPoints').checked = (localStorage.getItem('mangaDefaultShowPoints') ?? 'true') === 'true';
+      document.getElementById('settingShowGoalLine').checked = (localStorage.getItem('mangaDefaultShowGoalLine') ?? 'false') === 'true';
+      document.getElementById('settingReduceMotion').checked = localStorage.getItem('mangaReduceMotion') === 'true';
+      document.getElementById('settingStaleHours').value = localStorage.getItem('mangaStaleHours') || '24';
+  }
+
+  function setDefaultChartView(view) {
+      try { localStorage.setItem('mangaDefaultChartView', view); } catch (e) { /* storage unavailable */ }
+      document.querySelectorAll('#defaultChartViewGroup .range-btn').forEach(b => b.classList.toggle('active', b.dataset.value === view));
+      setChartView(view);
+  }
+
+  function setDefaultShowPoints(checked) {
+      try { localStorage.setItem('mangaDefaultShowPoints', checked); } catch (e) { /* storage unavailable */ }
+      showPoints = checked;
+      document.getElementById('togglePoints').innerText = showPoints ? 'Hide Points' : 'Show Points';
+      buildChart();
+  }
+
+  function setDefaultShowGoalLine(checked) {
+      try { localStorage.setItem('mangaDefaultShowGoalLine', checked); } catch (e) { /* storage unavailable */ }
+      showGoalLine = checked;
+      document.getElementById('toggleGoalLine').innerText = showGoalLine ? 'Hide Goal Line' : 'Show Goal Line';
+      buildChart();
+  }
+
+  function setReduceMotion(checked) {
+      try { localStorage.setItem('mangaReduceMotion', checked); } catch (e) { /* storage unavailable */ }
+      document.documentElement.setAttribute('data-reduce-motion', checked ? '1' : '0');
+  }
+
+  function setStaleHours(hours) {
+      const n = Math.max(1, Math.min(720, parseInt(hours, 10) || 24));
+      try { localStorage.setItem('mangaStaleHours', String(n)); } catch (e) { /* storage unavailable */ }
+      document.getElementById('settingStaleHours').value = n;
+      renderAll();
   }
 
   /* ============================================================
@@ -673,14 +941,22 @@
 
   function computeGoalStats(goal, current, histAvg) {
       const target = parseInt(goal.targetChapters);
-      const remaining = target - current;
       let dailyPace = '—', daysLeftStr = '—', finishStr = '—';
-      const progressPct = target > 0 ? Math.max(0, Math.min(100, (current / target) * 100)) : 0;
+
+      // Malformed/blank target (only reachable via a hand-edited or imported
+      // ledger_config.json, not the normal form) — bail out with clean
+      // placeholders instead of letting NaN/Invalid Date leak into the UI.
+      if (!Number.isFinite(target) || target <= 0) {
+          return { dailyPace, daysLeftStr, finishStr, progressPct: 0, remaining: NaN };
+      }
+
+      const remaining = target - current;
+      const progressPct = Math.max(0, Math.min(100, (current / target) * 100));
 
       if (remaining <= 0) {
           dailyPace = '0.0'; daysLeftStr = 'Done'; finishStr = 'Reached';
       } else {
-          const daysUntil = Math.ceil((new Date(goal.targetDate) - new Date()) / 86400000);
+          const daysUntil = Math.ceil((localDateFromYMD(goal.targetDate) - new Date()) / 86400000);
           if (daysUntil > 0) {
               dailyPace = (remaining / daysUntil).toFixed(1);
               daysLeftStr = daysUntil + 'd';
@@ -699,6 +975,7 @@
   // Explicit ETA sentence for a goal — surfaces what's otherwise only
   // readable by eyeballing the trend line on the chart.
   function goalEtaSentence(goal, s, histAvg) {
+      if (isNaN(s.remaining)) return 'This goal is missing a valid target chapter count.';
       if (s.remaining <= 0) return 'Goal already reached! 🎉';
       if (histAvg <= 0) return 'No reading pace recorded yet — projection unavailable.';
       if (s.finishStr === '—') return 'Deadline has passed with progress still remaining.';
@@ -728,7 +1005,7 @@
           card.innerHTML = `
             <div class="goal-card-head">
               <div class="goal-title">${parseInt(goal.targetChapters).toLocaleString()} ch
-                <span class="goal-deadline">by ${new Date(goal.targetDate).toLocaleDateString('en-GB')}</span>
+                <span class="goal-deadline">by ${localDateFromYMD(goal.targetDate).toLocaleDateString('en-GB')}</span>
               </div>
               <div class="goal-actions">
                 <button class="icon-btn ${goal.starred ? 'starred' : ''}" title="Star this goal" onclick="toggleStar(${goal.id})">★</button>
@@ -768,7 +1045,7 @@
           if (wdEl) wdEl.innerHTML = wd ? weekDeltaText(wd) : '';
           return;
       }
-      titleEl.innerText = `Starred goal — ${parseInt(starred.targetChapters).toLocaleString()} by ${new Date(starred.targetDate).toLocaleDateString('en-GB')}`;
+      titleEl.innerText = `Starred goal — ${parseInt(starred.targetChapters).toLocaleString()} by ${localDateFromYMD(starred.targetDate).toLocaleDateString('en-GB')}`;
       const s = computeGoalStats(starred, current, histAvg);
       document.getElementById('daily-pace').innerText = s.dailyPace;
       document.getElementById('days-left').innerText = s.daysLeftStr;
@@ -861,8 +1138,8 @@
       }
 
       const keys = Object.keys(dayHasEntry).sort();
-      const cursor = new Date(keys[0]);
-      const lastDate = new Date(keys[keys.length - 1]);
+      const cursor = localDateFromYMD(keys[0]);
+      const lastDate = localDateFromYMD(keys[keys.length - 1]);
       const days = [];
       while (cursor <= lastDate) {
           const key = dayKey(cursor);
@@ -891,29 +1168,33 @@
           if (queue.length > 7) windowSum -= queue.shift();
           bestWeek = Math.max(bestWeek, windowSum);
       });
-      return { bestDay, bestWeek };
-  }
 
-  // Session length: date2 - date1 per entry is a reading-session duration.
-  function computeSessionStats() {
-      if (!mangaHistoryData.length) return { avgMinutes: 0, longestMinutes: 0 };
-      let totalMinutes = 0, longestMinutes = 0, count = 0;
-      mangaHistoryData.forEach(e => {
-          const mins = (parseVBSDate(e.date2) - parseVBSDate(e.date1)) / 60000;
-          if (mins >= 0) {
-              totalMinutes += mins;
-              longestMinutes = Math.max(longestMinutes, mins);
-              count++;
-          }
+      // Avg active day: chapters per calendar day, counting only days that
+      // actually had reading (d.diff > 0). The first and last calendar day of
+      // the WHOLE tracked history are excluded from this specific average —
+      // tracking starts and ends at some arbitrary time of day, not midnight,
+      // so those two days are only ever partially covered (you may have read
+      // before tracking began, or could still read more after the last
+      // logged entry, on that same date). Counting them as if they were full
+      // days would understate the average, especially badly while the
+      // dataset is still young (a handful of days) since the distortion
+      // doesn't dilute away yet the way it does over weeks/months of history.
+      const middleDays = days.slice(1, -1);
+      let activeSum = 0, activeCount = 0;
+      middleDays.forEach(d => {
+          if (d.diff > 0) { activeSum += d.diff; activeCount++; }
       });
-      return { avgMinutes: count ? totalMinutes / count : 0, longestMinutes };
+      const avgActiveDay = activeCount ? activeSum / activeCount : 0;
+
+      return { bestDay, bestWeek, avgActiveDay, avgActiveDayReady: activeCount > 0 };
   }
 
-  function formatMinutes(m) {
-      if (m < 1) return '<1m';
-      const h = Math.floor(m / 60), mm = Math.round(m % 60);
-      return h > 0 ? `${h}h ${mm}m` : `${mm}m`;
-  }
+  // NOTE: an "Avg session" / "Longest session" stat used to live here, inferred
+  // from sync-poll timestamps. Removed — even after fixing the idle-time bug it
+  // was still an unreliable estimate (couldn't distinguish real multi-hour
+  // sessions from bursts around unmonitored gaps), and it wasn't a stat worth
+  // that much guesswork. See computeBests() and the streak/avg-active-day stats
+  // below for the reliable replacements.
 
   // Consistency / volatility: coefficient of variation across active read-days.
   function computeConsistency(days) {
@@ -979,7 +1260,7 @@
   ============================================================ */
   function buildHeatmapWeeks(days) {
       if (!days.length) return [];
-      const first = new Date(days[0].key);
+      const first = localDateFromYMD(days[0].key);
       const startPad = first.getDay();
       const cells = [];
       for (let i = 0; i < startPad; i++) cells.push(null);
@@ -1019,7 +1300,7 @@
       weeks.forEach((week, wi) => {
           const firstReal = week.find(d => d);
           if (firstReal) {
-              const d = new Date(firstReal.key);
+              const d = localDateFromYMD(firstReal.key);
               const m = d.getMonth();
               if (m !== lastMonth) {
                   const lbl = document.createElement('span');
@@ -1090,11 +1371,26 @@
   /* ============================================================
      CHART (trajectory / daily volume, with zoom/pan + target line)
   ============================================================ */
-  let chart, limit = 10, showPoints = true, chartView = 'cumulative', showGoalLine = false;
+  let chart, limit = 10,
+      showPoints = (localStorage.getItem('mangaDefaultShowPoints') ?? 'true') === 'true',
+      chartView = localStorage.getItem('mangaDefaultChartView') || 'cumulative',
+      showGoalLine = (localStorage.getItem('mangaDefaultShowGoalLine') ?? 'false') === 'true';
 
   function parseVBSDate(s) { return new Date(s); }
 
-  const ctx = document.getElementById('progressChart')?.getContext('2d');
+  // Parses a plain "yyyy-mm-dd" string (from <input type="date"> or from
+  // dayKey()) as LOCAL midnight instead of UTC midnight. `new Date("yyyy-mm-dd")`
+  // is spec'd to parse as UTC, which then displays/compares as the previous
+  // calendar day for anyone west of UTC (most of the Americas) once it's run
+  // back through local-time getters like toLocaleDateString/getDay/getMonth.
+  // Every place in this file that turns a bare date-only string into a Date
+  // for local display or local day-of-week/month math should use this instead
+  // of `new Date(str)`.
+  function localDateFromYMD(s) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+      if (!m) return new Date(s); // not a plain date-only string — leave as-is
+      return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+  }
 
   let pts = [], trendData = [], slope = 0, intercept = 0;
 
@@ -1128,7 +1424,7 @@
       const starred = goals.find(g => g.starred) || goals[0];
       if (!starred || !mangaHistoryData.length) return null;
       const target = parseInt(starred.targetChapters);
-      const targetDate = new Date(starred.targetDate);
+      const targetDate = localDateFromYMD(starred.targetDate);
       if (!target || isNaN(targetDate.getTime())) return null;
 
       const startEntry = mangaHistoryData[0];
@@ -1151,24 +1447,43 @@
 
   function buildChart() {
       if (chart) { chart.destroy(); chart = null; }
+      const ctx = document.getElementById('progressChart')?.getContext('2d');
+      if (!ctx) return;
       const theme = localStorage.getItem('mangaTheme') || 'kraft';
       const c = THEME_COLORS[theme] || THEME_COLORS.kraft;
 
+      // Default to showing just the last 7 days of activity on load/rebuild —
+      // a month or year of history at once makes the recent trend hard to read.
+      // Users can still pan/zoom out freely; this only sets the starting view.
+      const allDates = (chartView === 'daily'
+          ? computeDailyBreakdown().map(d => localDateFromYMD(d.key))
+          : pts.map(p => p.x)
+      );
+      let xMin, xMax;
+      if (allDates.length) {
+          xMax = new Date(Math.max(...allDates.map(d => d.getTime())));
+          xMin = new Date(xMax.getTime() - 7 * 86400000);
+      }
+
       const commonScales = {
-          x: { type: 'time', time: { unit: 'day' }, ticks: { color: c.inkSoft, font: { family: "'JetBrains Mono', monospace", size: 10 } }, grid: { color: c.grid } },
-          y: { ticks: { callback: v => Math.floor(v), color: c.inkSoft, font: { family: "'JetBrains Mono', monospace", size: 10 } }, grid: { color: c.grid } }
+          x: {
+              type: 'time', time: { unit: 'day' }, min: xMin, max: xMax,
+              ticks: { color: c.inkSoft, font: { family: "'JetBrains Mono', monospace", size: 10 } }, grid: { color: c.grid }
+          },
+          y: { min: chartView === 'daily' ? 0 : undefined, ticks: { callback: v => Math.floor(v), color: c.inkSoft, font: { family: "'JetBrains Mono', monospace", size: 10 } }, grid: { color: c.grid } }
       };
       const commonPlugins = {
           legend: { display: true, labels: { color: c.ink, font: { family: "'JetBrains Mono', monospace", size: 11 } } },
           zoom: {
-              pan: { enabled: true, mode: 'x' },
-              zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+              pan: { enabled: true, mode: 'xy' },
+              zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' },
+              limits: { y: { min: 0 } }
           }
       };
 
       if (chartView === 'daily') {
           const days = computeDailyBreakdown();
-          const barData = days.map(d => ({ x: new Date(d.key), y: d.diff }));
+          const barData = days.map(d => ({ x: localDateFromYMD(d.key), y: d.diff }));
           chart = new Chart(ctx, {
               type: 'bar',
               data: { datasets: [{ label: 'Chapters/day', data: barData, backgroundColor: c.red, borderColor: c.red, borderWidth: 1, borderRadius: 2 }] },
@@ -1247,7 +1562,15 @@
       });
   }
 
-  function updateVisible(val) { limit = parseInt(val); renderHistory(); }
+  function updateVisible(val) {
+      const parsed = parseInt(val, 10);
+      // Guard against non-numeric/blank input (e.g. the user clears the field
+      // or types letters) — parseInt would otherwise set `limit` to NaN, which
+      // never self-corrects (Math.max/Math.min propagate NaN) and paradoxically
+      // shows ALL entries instead of clamping to a sane default.
+      limit = isNaN(parsed) ? (isNaN(limit) ? 10 : limit) : parsed;
+      renderHistory();
+  }
 
   /* ============================================================
      CHANGE HISTORY — audit trail for manual ledger edits
@@ -1286,7 +1609,20 @@
   /* ============================================================
      FEATURE 4: IN-APP LEDGER CORRECTION (CRUD)
   ============================================================ */
+  let hasUnsavedEdits = false;
+
+  function updateUnsavedNote() {
+      const note = document.getElementById('unsaved-note');
+      if (note) note.style.display = hasUnsavedEdits ? 'block' : 'none';
+  }
+
+  // Called after every in-app ledger mutation (edit/delete/undo/live-append).
+  // These only ever touch the in-memory array — nothing here writes to disk —
+  // so we flag it clearly until the user runs "Export Cleaned Data" and
+  // actually replaces manga_history_data.js, or the edits are lost on reload.
   function afterDataMutation() {
+      hasUnsavedEdits = true;
+      updateUnsavedNote();
       recomputeDerived();
       renderHistory();
       renderAll();
@@ -1319,11 +1655,20 @@
       afterDataMutation();
   }
 
-  let lastDeleted = null;
+  // Stack (not a single slot) so multiple deletes in a row can each be undone,
+  // most-recent-first — previously only the very last deletion was recoverable
+  // and earlier ones in the same burst were silently unrecoverable.
+  let deletedStack = [];
 
   function showUndoBanner() {
       const banner = document.getElementById('undo-banner');
       if (!banner) return;
+      const label = banner.querySelector('.undo-banner-label');
+      if (label) {
+          label.textContent = deletedStack.length > 1
+              ? `${deletedStack.length} entries deleted.`
+              : 'Entry deleted.';
+      }
       banner.style.display = 'flex';
       clearTimeout(showUndoBanner._t);
       showUndoBanner._t = setTimeout(hideUndoBanner, 8000);
@@ -1335,11 +1680,15 @@
   }
 
   function undoDelete() {
-      if (!lastDeleted) return;
-      mangaHistoryData.splice(lastDeleted.idx, 0, lastDeleted.entry);
-      logChange('undo', `restored chapters ${lastDeleted.entry.chapters} @ ${lastDeleted.entry.date1}`);
-      lastDeleted = null;
-      hideUndoBanner();
+      if (!deletedStack.length) return;
+      const last = deletedStack.pop();
+      mangaHistoryData.splice(last.idx, 0, last.entry);
+      logChange('undo', `restored chapters ${last.entry.chapters} @ ${last.entry.date1}`);
+      if (deletedStack.length) {
+          showUndoBanner(); // more still undoable — keep banner up, reset its timer
+      } else {
+          hideUndoBanner();
+      }
       afterDataMutation();
   }
 
@@ -1348,7 +1697,7 @@
       if (!entry) return;
       if (!confirm('Delete this ledger entry? You can undo immediately after.')) return;
       mangaHistoryData.splice(idx, 1);
-      lastDeleted = { entry, idx };
+      deletedStack.push({ entry, idx });
       logChange('delete', `chapters ${entry.chapters} @ ${entry.date1}`);
       showUndoBanner();
       afterDataMutation();
@@ -1366,17 +1715,22 @@
       a.download = 'manga_history_data.js';
       a.click();
       URL.revokeObjectURL(url);
+      hasUnsavedEdits = false;
+      updateUnsavedNote();
   }
 
   /* ============================================================
      FEATURE 5: CONFIGURATION BACKUP / RESTORE
   ============================================================ */
+  const CONFIG_KEYS = [
+      'mangaGoals', 'mangaTheme', 'mangaHistRange',
+      'mangaDefaultChartView', 'mangaDefaultShowPoints', 'mangaDefaultShowGoalLine',
+      'mangaReduceMotion', 'mangaStaleHours'
+  ];
+
   function exportConfig() {
-      const config = {
-          mangaGoals: localStorage.getItem('mangaGoals'),
-          mangaTheme: localStorage.getItem('mangaTheme'),
-          mangaHistRange: localStorage.getItem('mangaHistRange')
-      };
+      const config = {};
+      CONFIG_KEYS.forEach(key => { config[key] = localStorage.getItem(key); });
       const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1392,15 +1746,23 @@
       reader.onload = (e) => {
           try {
               const config = JSON.parse(e.target.result);
-              ['mangaGoals', 'mangaTheme', 'mangaHistRange'].forEach(key => {
+              CONFIG_KEYS.forEach(key => {
                   if (config[key] !== undefined && config[key] !== null) {
                       localStorage.setItem(key, config[key]);
                   }
               });
               loadGoals();
               histRange = localStorage.getItem('mangaHistRange') || 'all';
+              chartView = localStorage.getItem('mangaDefaultChartView') || 'cumulative';
+              showPoints = (localStorage.getItem('mangaDefaultShowPoints') ?? 'true') === 'true';
+              showGoalLine = (localStorage.getItem('mangaDefaultShowGoalLine') ?? 'false') === 'true';
+              document.documentElement.setAttribute('data-reduce-motion', localStorage.getItem('mangaReduceMotion') === 'true' ? '1' : '0');
               document.querySelectorAll('#histRangeToggle .range-btn').forEach(b => b.classList.toggle('active', b.dataset.range === histRange));
+              document.querySelectorAll('#chartViewToggle .range-btn').forEach(b => b.classList.toggle('active', b.dataset.view === chartView));
+              document.getElementById('togglePoints').innerText = showPoints ? 'Hide Points' : 'Show Points';
+              document.getElementById('toggleGoalLine').innerText = showGoalLine ? 'Hide Goal Line' : 'Show Goal Line';
               applyTheme(localStorage.getItem('mangaTheme') || 'kraft');
+              populateSettingsForm();
               renderHistory();
               renderAll();
               alert('Configuration imported successfully.');
@@ -1504,14 +1866,11 @@
       document.getElementById('historical-pace').innerText = `Historical avg (${rangeLabel}): ${histAvg.toFixed(1)} chapters/day`;
 
       const days = computeDailyBreakdown();
-      document.getElementById('streak-kanji').innerText = computeStreak(days);
       const bests = computeBests(days);
       document.getElementById('best-day').innerText = bests.bestDay;
       document.getElementById('best-week').innerText = bests.bestWeek;
-
-      const sessionStats = computeSessionStats();
-      document.getElementById('avg-session').innerText = formatMinutes(sessionStats.avgMinutes);
-      document.getElementById('longest-session').innerText = formatMinutes(sessionStats.longestMinutes);
+      document.getElementById('streak-stat').innerText = computeStreak(days);
+      document.getElementById('avg-active-day').innerText = bests.avgActiveDayReady ? bests.avgActiveDay.toFixed(1) : '—';
 
       const consistency = computeConsistency(days);
       const consEl = document.getElementById('consistency-line');
@@ -1527,15 +1886,33 @@
       buildPatternCharts();
       renderChangeLog();
 
-      const lastEntryDate = parseVBSDate(last.date1);
-      document.getElementById('stale-warning').style.display = (new Date() - lastEntryDate) > 86400000 ? 'inline-block' : 'none';
+      // Use date2, not date1 — date2 is the most recent CONFIRMED sync
+      // check-in (kept fresh by every idle poll), while date1 is just when
+      // the chapter count last changed, which can be far older even during
+      // a perfectly healthy, currently-idle sync. Matches updateLastSynced().
+      const lastSyncDate = parseVBSDate(last.date2);
+      const staleHours = parseFloat(localStorage.getItem('mangaStaleHours')) || 24;
+      const staleEl = document.getElementById('stale-warning');
+      staleEl.style.display = (new Date() - lastSyncDate) > staleHours * 3600000 ? 'inline-block' : 'none';
+      staleEl.innerText = `⚠ STALE — NO SYNC IN ${staleHours}H`;
       updateLastSynced();
   }
 
   window.onload = () => {
+      // Chart card lives in a <template> and gets inserted into whichever page
+      // slot needs it (Home vs the fullscreen Chart page) — start it in Home.
+      document.getElementById('chart-slot-home').appendChild(
+          document.getElementById('chart-card-template').content.cloneNode(true)
+      );
+      showPage('home');
+
       loadGoals();
       loadChangeLog();
       applyTheme(localStorage.getItem('mangaTheme') || 'kraft');
+      document.documentElement.setAttribute('data-reduce-motion', localStorage.getItem('mangaReduceMotion') === 'true' ? '1' : '0');
+      document.querySelectorAll('#chartViewToggle .range-btn').forEach(b => b.classList.toggle('active', b.dataset.view === chartView));
+      document.getElementById('togglePoints').innerText = showPoints ? 'Hide Points' : 'Show Points';
+      document.getElementById('toggleGoalLine').innerText = showGoalLine ? 'Hide Goal Line' : 'Show Goal Line';
       document.querySelectorAll('#histRangeToggle .range-btn').forEach(b => b.classList.toggle('active', b.dataset.range === histRange));
       renderHistory();
       renderAll();

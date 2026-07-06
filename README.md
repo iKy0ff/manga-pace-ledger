@@ -83,6 +83,7 @@ Each run:
 ## ⚠️ Warnings & things to know
 
 - **This is hardcoded to one Kitsu account by default.** See [Pointing it at your own Kitsu account](#pointing-it-at-your-own-kitsu-account) below — you must update the user ID in two places before forking, or you'll be tracking someone else's reading progress.
+- **The sync's timezone is also hardcoded (`Europe/Paris`, the original owner's).** GitHub-hosted runners run in UTC, so `TZ` in `.github/workflows/sync.yml` is what makes every synced timestamp match a real person's clock instead of UTC. If you fork this and don't change it, every entry will be logged using the *original owner's* timezone, which will quietly skew your streaks, heatmap, and hour/day-of-week charts. See [Pointing it at your own Kitsu account](#pointing-it-at-your-own-kitsu-account) for where to change it. This only affects the automated GitHub Actions sync — the local VBS/manual paths already use whatever timezone your own PC is set to.
 - **GitHub Actions' own schedule is not exact.** GitHub explicitly does not guarantee cron jobs run on time — during high load, a scheduled run can be delayed anywhere from a couple of minutes to much longer. If you need tighter timing, use [Option B](#option-b--github-actions--an-external-cron-pinger-more-frequent-updates) below.
 - **Very short intervals aren't reliable either way.** GitHub won't run scheduled workflows more often than about every 5 minutes, and pushing much below that (via an external pinger or otherwise) increases the risk of overlapping/delayed runs. `sync.yml` already sets `concurrency` so overlapping runs queue instead of racing each other, but there's no reason to poll faster than your reading pace changes.
 - **Never commit a token to the repo.** Whether you use GitHub's built-in scheduler or an external cron service, any Personal Access Token (PAT) belongs only in that external service's own secret/credential storage — never in a workflow file, a commit, or anywhere public. If you ever paste a token into a screenshot, chat, or issue by mistake, treat it as compromised and revoke it immediately from **GitHub → Settings → Developer settings → Personal access tokens**.
@@ -184,19 +185,21 @@ Note: the **"⇅ Check Live"** button on the dashboard itself is a separate, unr
 
 ## Pointing it at your own Kitsu account
 
-The Kitsu user ID is baked directly into the URL in **three places** — anyone forking this repo needs to change all of them, or it'll keep syncing the original owner's chapter count, not yours:
+The Kitsu user ID is baked directly into the URL in **three places** — anyone forking this repo needs to change all of them, or it'll keep syncing the original owner's chapter count, not yours. The sync timezone is a **fourth** thing worth changing at the same time, in a fourth place:
 
 | File | Line |
 |---|---|
 | `scripts/sync.mjs` | `const KITSU_URL = 'https://kitsu.io/api/edge/users/<KITSU_USER_ID>/stats';` |
 | `manga-pace-ledger.html` | inside `checkForUpdates()`: `fetch('https://kitsu.io/api/edge/users/<KITSU_USER_ID>/stats?cachebuster=...')` |
 | `local-fallback/fetch_manga_stats.vbs` | `url = "https://kitsu.io/api/edge/users/<KITSU_USER_ID>/stats?cachebuster=" & timestamp` — only relevant if you plan to use the Windows fallback script |
+| `.github/workflows/sync.yml` | `TZ: 'Europe/Paris'` — controls what "local time" means for every synced timestamp; only relevant if you use the GitHub Actions sync (Option A/B) |
 
 **To point it at your own account:**
 
 1. Find your Kitsu user ID — go to `https://kitsu.io/api/edge/users?filter[slug]=YOUR_USERNAME` in a browser (or check your profile URL/page source) and copy the numeric `id` field.
 2. Replace the placeholder ID with that number in the files above (at minimum the first two; the third only if you use the VBS fallback).
-3. Since your reading history will start from zero, either let `manga_history_data.js` reinitialize on the next sync (delete its contents and start fresh) or manually seed it with your own historical data in the same `{ date1, date2, chapters }` format.
+3. If you're using the GitHub Actions sync, also change `TZ: 'Europe/Paris'` in `.github/workflows/sync.yml` to your own IANA time zone name (e.g. `America/New_York`, `Asia/Tokyo`) — find yours in the "TZ identifier" column of [this list](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). Skipping this means every synced entry is timestamped as if you lived in Paris, which will throw off your streaks, heatmap, and hour/day-of-week charts. Not needed for Option C (manual/local) — that path already uses your own PC's clock.
+4. Since your reading history will start from zero, either let `manga_history_data.js` reinitialize on the next sync (delete its contents and start fresh) or manually seed it with your own historical data in the same `{ date1, date2, chapters }` format.
 
 Note: `scripts/sync.mjs` will auto-create `manga_history_data.js` with a single starting entry if the file doesn't exist yet, so deleting it entirely before the first run on a new account works fine.
 

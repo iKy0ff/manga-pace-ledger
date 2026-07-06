@@ -17,6 +17,15 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     env:
+      # IMPORTANT FOR FORKS: GitHub-hosted runners default to UTC. This value
+      # controls what "local time" means for every timestamp the sync writes
+      # (date1/date2 on each ledger entry), which in turn drives the
+      # dashboard's streaks, heatmap, and hour/day-of-week charts. It's
+      # hardcoded to the original owner's timezone below — if you fork this,
+      # change it to your own IANA time zone name (e.g. "America/New_York",
+      # "Asia/Tokyo") from https://en.wikipedia.org/wiki/List_of_tz_database_time_zones,
+      # the same way you change the Kitsu user ID — see README →
+      # "Pointing it at your own Kitsu account".
       TZ: 'Europe/Paris'
 
     # ── Sync mode gate ─────────────────────────────────────────────────
