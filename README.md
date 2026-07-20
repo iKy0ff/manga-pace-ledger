@@ -18,6 +18,7 @@ A self-updating dashboard that tracks manga chapters read (via [Kitsu](https://k
   - [Option B — GitHub Actions + an external cron pinger](#option-b--github-actions--an-external-cron-pinger-more-frequent-updates)
   - [Option C — Manual (local) only](#option-c--manual-local-only-no-automation)
 - [Switching sync modes](#switching-sync-modes)
+- [Choosing a data source (Kitsu or MangaBaka)](#choosing-a-data-source-kitsu-or-mangabaka)
 - [Pointing it at your own Kitsu account](#pointing-it-at-your-own-kitsu-account)
 - [Customizing](#customizing)
 - [More / notes](#more--notes)
@@ -53,11 +54,13 @@ A scheduled GitHub Actions workflow polls the Kitsu API, compares the result to 
 |---|---|
 | `manga-pace-ledger.html` | The dashboard — charts, streaks, goals, pace stats. Reads `manga_history_data.js` on load. |
 | `manga_history_data.js` | The data file. An array of `{ date1, date2, chapters }` entries; overwritten in place by the sync. |
-| `scripts/sync.mjs` | Node script that fetches Kitsu, parses the chapter count, and appends/updates an entry. |
+| `scripts/sync.mjs` | Node script that fetches your chapter count from the configured provider and appends/updates an entry. |
+| `scripts/providers.mjs` | The two data sources (Kitsu and MangaBaka) behind one interface, plus MangaBaka's response decoding and endpoint-hash recovery. |
 | `.github/workflows/sync.yml` | Scheduled workflow that runs `sync.mjs` and commits the result. |
 | `manga_history_data.bak` | Rolling backup — last version of the data file before the most recent write. Always overwritten in place, so it never grows. |
 | `daily_backup/manga_history_data_YYYYMMDD.bak.js` | One dated backup per day, refreshed on same-day reruns. Auto-pruned after 30 days — see [below](#the-sync-logic). |
 | `sync_errors.log` | Timestamped log of failed fetches, parse errors, or skipped anomalies. Empty/absent when everything's healthy. |
+| `sync_status.json` | Machine-readable result of the most recent sync run, rewritten every run (including failures). The dashboard reads it to show the sync-status banner. |
 | `local-fallback/fetch_manga_stats.vbs` | Original Windows script this was ported from. Only relevant if you want to run the sync locally instead of via GitHub Actions — not needed for the automated flow. |
 | `favicons/` | Site favicon set (browser tab / home-screen icon) — `favicon.ico` plus PNGs at several sizes. |
 | `.nojekyll` | Empty marker file that tells GitHub Pages to skip Jekyll processing, since this is a plain static site. |
@@ -83,6 +86,7 @@ Each run:
 ## ⚠️ Warnings & things to know
 
 - **This is hardcoded to one Kitsu account by default.** See [Pointing it at your own Kitsu account](#pointing-it-at-your-own-kitsu-account) below — you must update the user ID in two places before forking, or you'll be tracking someone else's reading progress.
+- **The MangaBaka data source depends on an undocumented endpoint.** If you set `PROVIDER = 'mangabaka'`, be aware it can break without warning whenever MangaBaka redeploys. The sync tries to recover automatically and the dashboard shows a failure banner when it can't — see [Choosing a data source](#choosing-a-data-source-kitsu-or-mangabaka). Kitsu remains the default precisely because it's a documented, stable API.
 - **The sync's timezone is also hardcoded (`Europe/Paris`, the original owner's).** GitHub-hosted runners run in UTC, so `TZ` in `.github/workflows/sync.yml` is what makes every synced timestamp match a real person's clock instead of UTC. If you fork this and don't change it, every entry will be logged using the *original owner's* timezone, which will quietly skew your streaks, heatmap, and hour/day-of-week charts. See [Pointing it at your own Kitsu account](#pointing-it-at-your-own-kitsu-account) for where to change it. This only affects the automated GitHub Actions sync — the local VBS/manual paths already use whatever timezone your own PC is set to.
 - **GitHub Actions' own schedule is not exact.** GitHub explicitly does not guarantee cron jobs run on time — during high load, a scheduled run can be delayed anywhere from a couple of minutes to much longer. If you need tighter timing, use [Option B](#option-b--github-actions--an-external-cron-pinger-more-frequent-updates) below.
 - **Very short intervals aren't reliable either way.** GitHub won't run scheduled workflows more often than about every 5 minutes, and pushing much below that (via an external pinger or otherwise) increases the risk of overlapping/delayed runs. `sync.yml` already sets `concurrency` so overlapping runs queue instead of racing each other, but there's no reason to poll faster than your reading pace changes.
@@ -180,6 +184,45 @@ If `SYNC_MODE` is never created, the workflow defaults to `both` — matching th
 For **Manual (local)** mode specifically, both the `schedule` and `workflow_dispatch` triggers are blocked — including the "Run workflow" button in the Actions tab. If you ever want to do a one-off cloud test run while in this mode, temporarily switch `SYNC_MODE` to something else, run it, then switch back.
 
 Note: the **"⇅ Check Live"** button on the dashboard itself is a separate, unrelated feature — it does a one-off client-side check straight from your browser and only affects what you see locally in that browser tab. It works regardless of which `SYNC_MODE` you're in.
+
+---
+
+## Choosing a data source (Kitsu or MangaBaka)
+
+The sync can read your chapter count from either **Kitsu** (the default) or **MangaBaka**. Set `PROVIDER` in `scripts/sync.mjs` — or the `PROVIDER` repo variable — to `kitsu` or `mangabaka`.
+
+| | Kitsu | MangaBaka |
+|---|---|---|
+| Endpoint | Documented public API | **Undocumented internal endpoint** |
+| Stability | Versioned; safe to depend on | Can break on any MangaBaka deploy |
+| Auth | None needed | None needed (public profile only) |
+| Works from the dashboard's "Check Live" button | Yes | **Usually no** — see below |
+| Counting | Whole chapters | Fractional; rounded **down** to whole chapters |
+
+### The catch with MangaBaka
+
+MangaBaka publishes no documented endpoint for a user's aggregate stats. This provider therefore calls the same internal endpoint their own profile page uses:
+
+```
+GET https://mangabaka.org/_app/remote/<HASH>/getStatsOverview?payload=<base64>
+```
+
+`<HASH>` is SvelteKit's per-build content hash for that server module. **It is expected to change whenever MangaBaka redeploys**, at which point the URL starts returning 404 with no warning and no changelog entry. Two things mitigate this:
+
+1. **Automatic recovery.** On failure the sync loads your public profile page (and, if needed, the JS bundles it references) hunting for the new hash. If it finds one, that run still succeeds and the dashboard shows a "SYNC RECOVERED" notice telling you to make the new hash permanent.
+2. **A visible failure signal.** Every run writes `sync_status.json`, and the workflow commits it even when the sync step failed. The dashboard reads it and shows a red **"⚠ SYNC FAILING"** banner with the error, the hint, and when the last successful sync was. Without this, a broken endpoint would look identical to simply not having read anything.
+
+If auto-recovery gives up, fix it manually: open your profile in a browser, DevTools → **Network** → filter **Fetch/XHR** → reload → click the `getStatsOverview` request → copy the hash segment out of its URL into `MANGABAKA_REMOTE_HASH`. Setting the `MANGABAKA_REMOTE_HASH` repo variable does this without a commit.
+
+Also note the dashboard's **"Check Live"** button generally *cannot* reach MangaBaka: that endpoint is same-origin only, so a cross-origin call from GitHub Pages is blocked by CORS. This isn't a bug and doesn't affect the scheduled sync, which runs server-side where CORS doesn't apply. The button still works normally on Kitsu.
+
+### Switching providers
+
+The two sites count slightly differently, so expect the total to shift by a small amount on the first run after switching. If it shifts *down*, that's written as one step-down entry and the switch day shows as zero chapters read (negative daily diffs are floored to zero) — harmless, but you can delete that entry from the History page if you want it clean.
+
+Only if the two totals happen to differ by more than the [anomaly threshold](#adjusting-the-anomaly-threshold) (500 by default) will the switch be blocked as a suspected spike. In that case run it once with `ALLOW_PROVIDER_SWITCH=1` (as a repo variable, or inline: `ALLOW_PROVIDER_SWITCH=1 node scripts/sync.mjs`), then remove it.
+
+The Windows fallback script (`local-fallback/fetch_manga_stats.vbs`) is **Kitsu-only** and was left unchanged.
 
 ---
 

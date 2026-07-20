@@ -378,6 +378,21 @@
     font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--ink);
   }
 
+  /* Sync status alert — shown when sync_status.json reports a failed run */
+  .sync-alert{
+    border:2px solid var(--stamp-red); background:rgba(var(--stamp-red-rgb),0.1);
+    padding:12px 16px; margin-bottom:16px;
+    font-family:'JetBrains Mono', monospace; color:var(--ink);
+  }
+  .sync-alert.is-warning{
+    border-color:var(--ink-soft); background:rgba(var(--ink-rgb,0,0,0),0.05);
+  }
+  .sync-alert-title{ font-weight:700; font-size:13px; letter-spacing:.03em; margin-bottom:6px; }
+  .sync-alert-body{ font-size:11.5px; color:var(--ink-soft); line-height:1.5; }
+  .sync-alert-hint{ font-size:11.5px; color:var(--ink-soft); line-height:1.5; margin-top:6px; }
+  .sync-alert-hint:empty{ display:none; }
+  .sync-alert code{ font-family:'JetBrains Mono', monospace; font-weight:700; color:var(--ink); }
+
   /* Unsaved-edits note (edits live only in this browser tab until exported) */
   .unsaved-note{
     font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--stamp-red-deep);
@@ -498,6 +513,15 @@
 
   <!-- ============ HOME ============ -->
   <div class="page" id="page-home">
+    <!-- Populated from sync_status.json, which the sync workflow rewrites on
+         every run (including failed ones). This is the only way a broken
+         provider endpoint becomes visible: the chapter count would otherwise
+         just silently stop moving. -->
+    <div class="sync-alert" id="sync-alert" style="display:none;">
+      <div class="sync-alert-title" id="sync-alert-title"></div>
+      <div class="sync-alert-body" id="sync-alert-body"></div>
+      <div class="sync-alert-hint" id="sync-alert-hint"></div>
+    </div>
     <div class="home-utility-bar">
       <div class="home-utility-left">
         <div id="stale-warning">⚠ STALE — NO RECENT SYNC</div>
@@ -1779,6 +1803,19 @@
   ============================================================ */
   const CLIENT_ANOMALY_THRESHOLD = 500; // mirrors the VBS-side guard
 
+  /* ── Provider config — keep in sync with scripts/sync.mjs ─────────────────
+     'kitsu'     → documented public API, works from the browser (CORS-friendly)
+     'mangabaka' → undocumented internal endpoint. The scheduled sync can read
+                   it fine, but this in-browser button usually CANNOT: the
+                   endpoint is same-origin-only, so a cross-origin call from
+                   GitHub Pages is normally blocked by CORS. That's expected,
+                   not a bug — rely on the scheduled sync instead, and watch
+                   the sync-status banner for breakages. ------------------- */
+  const PROVIDER = 'mangabaka';
+  const KITSU_USER_ID = '1699796';
+  const MANGABAKA_USERNAME = 'k_y';
+  const MANGABAKA_REMOTE_HASH = 'tweimu';
+
   function formatVBSStyle(d) {
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const dd = String(d.getDate()).padStart(2, '0');
@@ -1796,42 +1833,114 @@
       const now = new Date();
       const fmt = formatVBSStyle(now);
       mangaHistoryData.push({ date1: fmt, date2: fmt, chapters: units });
-      logChange('sync', `Appended live entry from Kitsu check: ${units} chapters at ${fmt}`);
+      logChange('sync', `Appended live entry from ${PROVIDER === 'mangabaka' ? 'MangaBaka' : 'Kitsu'} check: ${units} chapters at ${fmt}`);
       afterDataMutation();
       document.getElementById('updateStatus').innerText = 'Appended — remember to run the VBS sync (or use Export Cleaned Data) to persist this to disk.';
+  }
+
+  /* Browser-side mirror of scripts/providers.mjs. Kept deliberately small —
+     the scheduled sync is the authoritative path; this button is a convenience
+     for spotting new chapters without waiting for the next run. */
+
+  function buildMangaBakaPayload(username) {
+      // SvelteKit remote-function argument encoding, base64'd:
+      //   [["__skrao",1],{"username":2},"<username>"]
+      const json = JSON.stringify([['__skrao', 1], { username: 2 }, username]);
+      return btoa(unescape(encodeURIComponent(json)));
+  }
+
+  // devalue flattened-array decoder: index 0 is the root, non-negative numbers
+  // are back-references to other indices (devalue's dedupe scheme).
+  function decodeDevalue(flat) {
+      if (!Array.isArray(flat) || !flat.length) throw new Error('empty devalue payload');
+      const seen = new Map();
+      const sentinels = { '-1': undefined, '-2': undefined, '-3': NaN, '-4': Infinity, '-5': -Infinity, '-6': -0 };
+      function resolve(enc) {
+          if (typeof enc !== 'number') return enc;
+          if (enc < 0) {
+              if (String(enc) in sentinels) return sentinels[String(enc)];
+              throw new Error('unknown devalue sentinel ' + enc);
+          }
+          if (enc >= flat.length) throw new Error('devalue index out of range');
+          if (seen.has(enc)) return seen.get(enc);
+          return hydrate(flat[enc], enc);
+      }
+      function hydrate(raw, i) {
+          if (raw === null || typeof raw !== 'object') { seen.set(i, raw); return raw; }
+          if (Array.isArray(raw)) {
+              if (raw[0] === 'Date') { const d = new Date(raw[1]); seen.set(i, d); return d; }
+              const arr = []; seen.set(i, arr);
+              for (const item of raw) arr.push(resolve(item));
+              return arr;
+          }
+          const obj = {}; seen.set(i, obj);
+          for (const k of Object.keys(raw)) obj[k] = resolve(raw[k]);
+          return obj;
+      }
+      return resolve(0);
+  }
+
+  function findKeyDeep(value, key, maxDepth = 8) {
+      const queue = [[value, 0]];
+      const visited = new Set();
+      while (queue.length) {
+          const [node, depth] = queue.shift();
+          if (!node || typeof node !== 'object' || depth > maxDepth || visited.has(node)) continue;
+          visited.add(node);
+          if (!Array.isArray(node) && Object.prototype.hasOwnProperty.call(node, key)) return node[key];
+          for (const child of Object.values(node)) queue.push([child, depth + 1]);
+      }
+      return undefined;
+  }
+
+  async function fetchLiveChapters() {
+      if (PROVIDER === 'mangabaka') {
+          const url = 'https://mangabaka.org/_app/remote/' + MANGABAKA_REMOTE_HASH +
+                      '/getStatsOverview?payload=' + encodeURIComponent(buildMangaBakaPayload(MANGABAKA_USERNAME));
+          const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const outer = await res.json();
+          if (!outer || typeof outer.data !== 'string') throw new Error('unexpected response shape');
+          const total = findKeyDeep(decodeDevalue(JSON.parse(outer.data)), 'total_chapters_read');
+          if (typeof total !== 'number' || !isFinite(total)) throw new Error('no total_chapters_read in response');
+          return Math.floor(total); // MangaBaka reports fractional progress
+      }
+
+      const res = await fetch('https://kitsu.io/api/edge/users/' + KITSU_USER_ID + '/stats?cachebuster=' + Date.now(), {
+          headers: { 'Accept': 'application/vnd.api+json' }
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+
+      // Mirror the VBS script's parsing exactly rather than assuming a
+      // structured JSON path — Kitsu doesn't expose "units" where a
+      // plain data[].attributes.units lookup would find it, which is
+      // why the working VBS sync does a raw substring/regex search.
+      let pos = text.indexOf('"kind":"manga-amount-consumed"');
+      if (pos === -1) pos = text.indexOf('"kind": "manga-amount-consumed"');
+      if (pos === -1) throw new Error("couldn't find manga-amount-consumed in response");
+      const chunk = text.slice(pos, pos + 300);
+      const unitsMatch = chunk.match(/"units"\s*:\s*(\d+)/);
+      if (!unitsMatch) throw new Error("couldn't find a units value near manga-amount-consumed");
+      return parseInt(unitsMatch[1]);
   }
 
   async function checkForUpdates() {
       const btn = document.getElementById('checkUpdatesBtn');
       const statusEl = document.getElementById('updateStatus');
       if (!mangaHistoryData.length) return;
+      const providerLabel = PROVIDER === 'mangabaka' ? 'MangaBaka' : 'Kitsu';
       btn.disabled = true;
-      statusEl.innerText = 'Checking Kitsu…';
+      statusEl.innerText = `Checking ${providerLabel}…`;
       try {
-          const res = await fetch('https://kitsu.io/api/edge/users/1699796/stats?cachebuster=' + Date.now(), {
-              headers: { 'Accept': 'application/vnd.api+json' }
-          });
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          const text = await res.text();
-
-          // Mirror the VBS script's parsing exactly rather than assuming a
-          // structured JSON path — Kitsu doesn't expose "units" where a
-          // plain data[].attributes.units lookup would find it, which is
-          // why the working VBS sync does a raw substring/regex search.
-          let pos = text.indexOf('"kind":"manga-amount-consumed"');
-          if (pos === -1) pos = text.indexOf('"kind": "manga-amount-consumed"');
-          if (pos === -1) throw new Error("couldn't find manga-amount-consumed in response");
-          const chunk = text.slice(pos, pos + 300);
-          const unitsMatch = chunk.match(/"units"\s*:\s*(\d+)/);
-          if (!unitsMatch) throw new Error("couldn't find a units value near manga-amount-consumed");
-          const liveUnits = parseInt(unitsMatch[1]);
+          const liveUnits = await fetchLiveChapters();
           const last = mangaHistoryData[mangaHistoryData.length - 1];
 
           if (liveUnits > last.chapters) {
               const diff = liveUnits - last.chapters;
               statusEl.innerHTML = '';
               if (diff >= CLIENT_ANOMALY_THRESHOLD) {
-                  statusEl.innerText = `⚠ Live value jumped by ${diff} chapters — looks anomalous, not auto-applying. Check Kitsu manually.`;
+                  statusEl.innerText = `⚠ Live value jumped by ${diff} chapters — looks anomalous, not auto-applying. Check ${providerLabel} manually.`;
               } else {
                   statusEl.append(`${diff} new chapter${diff === 1 ? '' : 's'} available (now at ${liveUnits}).`);
                   const applyBtn = document.createElement('button');
@@ -1841,12 +1950,19 @@
                   statusEl.appendChild(applyBtn);
               }
           } else if (liveUnits === last.chapters) {
-              statusEl.innerText = `Up to date — Kitsu also shows ${liveUnits} chapters.`;
+              statusEl.innerText = `Up to date — ${providerLabel} also shows ${liveUnits} chapters.`;
           } else {
-              statusEl.innerText = `Kitsu shows ${liveUnits}, lower than local ${last.chapters} — leaving local data untouched.`;
+              statusEl.innerText = `${providerLabel} shows ${liveUnits}, lower than local ${last.chapters} — leaving local data untouched.`;
           }
       } catch (err) {
-          statusEl.innerText = 'Live check failed (' + err.message + '). This is often a CORS restriction when opening the file directly — the VBS sync still works fine.';
+          // A cross-origin fetch failure surfaces as an opaque TypeError, so we
+          // can't tell "CORS blocked" apart from "endpoint is gone" here. Say so
+          // honestly rather than guessing, and point at the authoritative signal.
+          const mb = PROVIDER === 'mangabaka';
+          statusEl.innerText = 'Live check failed (' + err.message + '). '
+              + (mb
+                  ? "MangaBaka's stats endpoint is same-origin only, so this button is usually blocked by CORS — that's expected. The scheduled sync reads it server-side without that restriction; check the sync-status banner for its real state."
+                  : 'This is often a CORS restriction when opening the file directly — the scheduled sync still works fine.');
       } finally {
           btn.disabled = false;
       }
@@ -1898,6 +2014,63 @@
       updateLastSynced();
   }
 
+  /* ============================================================
+     SYNC STATUS BANNER
+     ------------------------------------------------------------
+     scripts/sync.mjs rewrites sync_status.json on every run, including
+     failed ones (the workflow's commit step is `if: always()`, so a
+     failure still reaches the site). Without this, a provider that
+     silently stops working just looks like "I haven't read anything
+     lately" — which is exactly the failure mode the MangaBaka endpoint
+     is prone to, since it can move on any of their deploys.
+  ============================================================ */
+  async function loadSyncStatus() {
+      const box = document.getElementById('sync-alert');
+      if (!box) return;
+      let status;
+      try {
+          const res = await fetch('sync_status.json?cachebuster=' + Date.now(), { cache: 'no-store' });
+          if (!res.ok) return;            // not deployed yet / local file:// — stay quiet
+          status = await res.json();
+      } catch {
+          return;                          // never let a missing status file break the page
+      }
+      if (!status || typeof status !== 'object') return;
+
+      const titleEl = document.getElementById('sync-alert-title');
+      const bodyEl  = document.getElementById('sync-alert-body');
+      const hintEl  = document.getElementById('sync-alert-hint');
+      const provider = status.provider === 'mangabaka' ? 'MangaBaka' : 'Kitsu';
+
+      const fmtWhen = (iso) => {
+          if (!iso) return 'never';
+          const d = new Date(iso);
+          return isNaN(d) ? String(iso) : d.toLocaleString('en-GB');
+      };
+
+      if (status.ok === false) {
+          box.style.display = 'block';
+          box.classList.remove('is-warning');
+          titleEl.innerText = `\u26A0 SYNC FAILING \u2014 ${provider}`;
+          bodyEl.innerText = `${status.error || 'Unknown error.'} Last successful sync: ${fmtWhen(status.lastSuccess)} (last attempt ${fmtWhen(status.lastRun)}). Your chapter count is frozen until this is fixed.`;
+          hintEl.innerText = status.hint || '';
+          return;
+      }
+
+      // Succeeded, but the endpoint had moved and was auto-recovered — the
+      // config is now stale even though today's run worked.
+      if (status.note) {
+          box.style.display = 'block';
+          box.classList.add('is-warning');
+          titleEl.innerText = `\u2139 SYNC RECOVERED \u2014 ${provider}`;
+          bodyEl.innerText = status.note;
+          hintEl.innerText = 'The next run may fail if this is not made permanent.';
+          return;
+      }
+
+      box.style.display = 'none';
+  }
+
   window.onload = () => {
       // Chart card lives in a <template> and gets inserted into whichever page
       // slot needs it (Home vs the fullscreen Chart page) — start it in Home.
@@ -1916,6 +2089,7 @@
       document.querySelectorAll('#histRangeToggle .range-btn').forEach(b => b.classList.toggle('active', b.dataset.range === histRange));
       renderHistory();
       renderAll();
+      loadSyncStatus();
       setInterval(updateLastSynced, 30000);
   };
 </script>

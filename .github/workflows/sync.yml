@@ -63,6 +63,21 @@ jobs:
         run: node scripts/sync.mjs
         continue-on-error: true
         id: sync_step
+        env:
+          # Optional repo variables (Settings → Secrets and variables →
+          # Actions → Variables). Leave them unset to use the defaults
+          # hardcoded in scripts/sync.mjs.
+          #   PROVIDER              kitsu | mangabaka
+          #   KITSU_USER_ID         numeric Kitsu user id
+          #   MANGABAKA_USERNAME    your MangaBaka username
+          #   MANGABAKA_REMOTE_HASH the endpoint hash that goes stale on
+          #                         MangaBaka deploys — settable here so you
+          #                         can fix a broken sync without a commit
+          PROVIDER: ${{ vars.PROVIDER }}
+          KITSU_USER_ID: ${{ vars.KITSU_USER_ID }}
+          MANGABAKA_USERNAME: ${{ vars.MANGABAKA_USERNAME }}
+          MANGABAKA_REMOTE_HASH: ${{ vars.MANGABAKA_REMOTE_HASH }}
+          ALLOW_PROVIDER_SWITCH: ${{ vars.ALLOW_PROVIDER_SWITCH }}
 
       - name: Commit and push if changed
         if: always()
@@ -75,6 +90,10 @@ jobs:
           git add manga_history_data.bak 2>/dev/null || true
           git add -A daily_backup/ 2>/dev/null || true
           git add sync_errors.log 2>/dev/null || true
+          # Written on every run, success or failure — this is what drives the
+          # dashboard's sync-status banner, so it must be committed even when
+          # the sync step above failed (hence this step's `if: always()`).
+          git add sync_status.json 2>/dev/null || true
           
           if git diff --cached --quiet; then
             echo "No changes to commit."
