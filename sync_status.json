@@ -1,10 +1,9 @@
 {
-  "ok": true,
+  "ok": false,
   "provider": "mangabaka",
-  "lastRun": "2026-08-26T12:45:36.475Z",
+  "lastRun": "2026-08-26T13:01:06.149Z",
   "lastSuccess": "2026-08-26T12:45:36.475Z",
-  "error": null,
-  "hint": null,
-  "note": null,
-  "chapters": 36290
+  "error": "after 3 attempts - HTTP 502; and auto-rediscovery of the endpoint hash failed. MangaBaka has probably changed its internal API. Re-capture the URL from DevTools (Network tab, filter Fetch/XHR, reload your profile page, look for getStatsOverview) and update MANGABAKA_REMOTE_HASH in scripts/sync.mjs.",
+  "hint": "MangaBaka uses an undocumented internal endpoint that moves whenever they redeploy. Open your profile page in a browser with DevTools → Network → Fetch/XHR, reload, click the getStatsOverview request, and copy the hash segment from its URL into MANGABAKA_REMOTE_HASH in scripts/sync.mjs. Switching PROVIDER back to \"kitsu\" also restores syncing immediately.",
+  "note": null
 }
