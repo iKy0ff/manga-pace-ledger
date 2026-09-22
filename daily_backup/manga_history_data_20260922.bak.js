@@ -1077,5 +1077,6 @@ const mangaHistoryData = [
   { date1: "22-Sep-26 12:30:50 AM", date2: "22-Sep-26 9:15:43 PM", chapters: 36786 },
   { date1: "22-Sep-26 9:30:53 PM", date2: "22-Sep-26 9:30:53 PM", chapters: 36788 },
   { date1: "22-Sep-26 9:45:38 PM", date2: "22-Sep-26 9:45:38 PM", chapters: 36790 },
-  { date1: "22-Sep-26 10:01:05 PM", date2: "22-Sep-26 10:01:05 PM", chapters: 36793 }
+  { date1: "22-Sep-26 10:01:05 PM", date2: "22-Sep-26 10:01:05 PM", chapters: 36793 },
+  { date1: "22-Sep-26 10:15:38 PM", date2: "22-Sep-26 10:15:38 PM", chapters: 36796 }
 ];
